@@ -7,7 +7,9 @@ import {ERC20Capped} from "@openzeppelin/contracts/token/ERC20";
 contract MooveToken is ERC20Capped {
 
 //variables declaration
-    uint256 deployTimeStamp;
+
+    //about time
+    uint256 public deployTimeStamp;
     uint256 private timestampWeek = 604800;
     uint8 private weeksOfVesting;
     
@@ -18,9 +20,12 @@ contract MooveToken is ERC20Capped {
     
     address public immutable teamAddress;
 
+    //token and vesting 
     uint256 public tokenPrice;
     bool public isTradingAllowed;
     bool private vestingPeriod = false;
+    bool firstCallForTotalClaims;
+    
     mapping (address => uint256) elegibleForClaims;
 
 
@@ -52,7 +57,7 @@ contract MooveToken is ERC20Capped {
         uint256 _olderUsersMintSupply,          // Supply for the older users
         uint256 _earlyAdopterMintSupply,        // Supply the users who interact with the protocol
         address[] memory _olderUsersAddresses,  // Array of older users
-        uint8 _weeksOfVesting                   // Duration of vesting period in weeks    
+        uint8 _weeksOfVesting,                  // Duration of vesting period in weeks    
         uint256 _tokenPrice                     // price of single token 
     ) ERC20(_name, _symbol) ERC20Capped(_cap) {
         require(_teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply  <= _cap, "Initial supply exceeds cap");
@@ -62,7 +67,7 @@ contract MooveToken is ERC20Capped {
         _mint(msg.sender, _teamMintSupply);
         teamMintSupply = _teamMintSupply;
 
-        uint256 internal remainingTokens;
+        uint256 remainingTokens;
 
         if(_olderUsersAddresses > 0 && _olderUsersMintSupply > 0){
             _mint(address(this), _olderUsersMintSupply);
@@ -92,14 +97,11 @@ contract MooveToken is ERC20Capped {
             revert("Max supply exceeded");
         }
 
-        uint256 private totalMintedToken = balanceOf(address(this)) + circulatingSupply();
+        uint256 totalMintedToken = balanceOf(address(this)) + circulatingSupply();
         emit TokenMinting(totalMintedToken, deployTimeStamp);
     }
 
-    function enableTrading() external onlyOwner {
-        isTradingAllowed = !isTradingAllowed; 
-        emit TradingStatusChanged(isTradingAllowed);
-    }
+
 
     function buyToken() public payable {
         require(msg.value > 0, "Insufficient funds");
@@ -109,29 +111,42 @@ contract MooveToken is ERC20Capped {
         //trasferire token al buyer, aggiornare i saldi e fare la matematica per la conversione tra token
 
         updateElegibleAdresses(msg.sender,msg.value); //check del calcolo tra i vari token
-
     }
 
     function updateElegibleAdresses(address _buyerAddress, uint256 _buyerAmount) private activeVestingPeriod {
         elegibleForClaims[_buyerAddress] += _buyerAmount;
     }
 
-
-    function checkEligibilityClaim() public view activeVestingPeriod returns (bool){ //aggiungere il ritorno dei possibili token
+    function checkEligibilityClaim() public view activeVestingPeriod returns (bool){ //aggiungere il ritorno della quantità dei possibili token da prelevare dall' utente
         if(eligibleForVesting[msg.sender] > 0) {
             return true;
             } else return false;
     }
 
-    function claimCountdownInDays() public view activeVestingPeriod return(uint256){
+    function claimCountdownInDays() public view activeVestingPeriod returns (uint256){
         uint256 remaningTime = (deployTimeStamp + (timestampWeek * weeksOfVesting) - block.timestamp);
         return reminingTime / 86400;
+    }
+
+    function getTotalBalanceClaims() private {
+        if(firstCallForTotalClaims == true){
+            firstCallForTotalClaims = false;
+        }
     }
 
     function vestingTokenClaims() public {
         require(vestingPeriod == false, "Vesting period isn't ended");
         require(eligibleForVesting[msg.sender] > 0, "You aren' t eligible for the claim");
+        
+        getTotalBalanceClaims();
+        //capire come "salvare" il totale dei saldi solo la prima volta per distribuire i token in base al volume scambiato
 
+
+    }
+
+    function enableTrading() external onlyOwner {
+        isTradingAllowed = !isTradingAllowed; 
+        emit TradingStatusChanged(isTradingAllowed);
     }
 
     
