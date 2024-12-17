@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.28;
 
-import {ERC20Capped} from "@openzeppelin/contracts/token/ERC20";
+import {ERC20Capped} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
 
 contract MooveToken is ERC20Capped {
 
