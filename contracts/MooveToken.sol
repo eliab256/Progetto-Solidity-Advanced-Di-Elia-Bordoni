@@ -16,10 +16,13 @@ contract MooveToken is ERC20Capped {
     uint256 public olderUsersMintSupply;    
     uint256 public earlyAdopterMintSupply;  
     
-    address public constant teamAddress;
+    address public immutable teamAddress;
 
-    bool private vestingPeriod = false;
+    uint256 public tokenPrice;
     bool public isTradingAllowed;
+    bool private vestingPeriod = false;
+    mapping (address => uint256) elegibleForClaims;
+
 
 //events
     event TradingStatusChanged (bool tradingIsAllowed);
@@ -29,8 +32,8 @@ contract MooveToken is ERC20Capped {
     modifier onlyOwner() {
         require(msg.sender == teamAddress, "Not authorized");
         _;
-        }
-
+    }
+    
     modifier maxSupplyNotReached(){
         require(circulatingSupply() + balanceOf(address(this)) < _cap, "Max supply reached");
         _;
@@ -49,11 +52,13 @@ contract MooveToken is ERC20Capped {
         uint256 _olderUsersMintSupply,          // Supply for the older users
         uint256 _earlyAdopterMintSupply,        // Supply the users who interact with the protocol
         address[] memory _olderUsersAddresses,  // Array of older users
-        uint8 _weeksOfVesting                   // Duration of vesting period in weeks     
+        uint8 _weeksOfVesting                   // Duration of vesting period in weeks    
+        uint256 _tokenPrice                     // price of single token 
     ) ERC20(_name, _symbol) ERC20Capped(_cap) {
         require(_teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply  <= _cap, "Initial supply exceeds cap");
         
         teamAddress = msg.sender;
+        tokenPrice = _tokenPrice;
         _mint(msg.sender, _teamMintSupply);
         teamMintSupply = _teamMintSupply;
 
@@ -103,26 +108,31 @@ contract MooveToken is ERC20Capped {
 
         //trasferire token al buyer, aggiornare i saldi e fare la matematica per la conversione tra token
 
-        updateElegibleAdresses(msg.sender);
+        updateElegibleAdresses(msg.sender,msg.value); //check del calcolo tra i vari token
 
     }
 
-    function updateElegibleAdresses(address _buyerAddress) private activeVestingPeriod {
-        
+    function updateElegibleAdresses(address _buyerAddress, uint256 _buyerAmount) private activeVestingPeriod {
+        elegibleForClaims[_buyerAddress] += _buyerAmount;
     }
 
 
-    function checkEligibilityClaim() public view {
-
+    function checkEligibilityClaim() public view activeVestingPeriod returns (bool){ //aggiungere il ritorno dei possibili token
+        if(eligibleForVesting[msg.sender] > 0) {
+            return true;
+            } else return false;
     }
 
-    function claimCountdown() public view{
-
+    function claimCountdownInDays() public view activeVestingPeriod return(uint256){
+        uint256 remaningTime = (deployTimeStamp + (timestampWeek * weeksOfVesting) - block.timestamp);
+        return reminingTime / 86400;
     }
 
     function vestingTokenClaims() public {
+        require(vestingPeriod == false, "Vesting period isn't ended");
+        require(eligibleForVesting[msg.sender] > 0, "You aren' t eligible for the claim");
 
     }
 
-     //require(block.timestamp < deployTimeStamp + (timestampWeek * 4), "The claim period has expired");
+    
 }
