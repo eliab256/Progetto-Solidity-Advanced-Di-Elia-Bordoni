@@ -21,6 +21,7 @@ contract MooveToken is ERC20Capped {
     address public immutable teamAddress;
 
     //token and vesting 
+    uint256 immutable cap;
     uint256 public tokenPrice;
     bool public isTradingAllowed;
     bool private vestingPeriod = false;
@@ -40,7 +41,7 @@ contract MooveToken is ERC20Capped {
     }
     
     modifier maxSupplyNotReached(){
-        require(circulatingSupply() + balanceOf(address(this)) < _cap, "Max supply reached");
+        require(circulatingSupply() + balanceOf(address(this)) < cap, "Max supply reached");
         _;
     }
 
@@ -53,7 +54,7 @@ contract MooveToken is ERC20Capped {
         string memory _name,                    // Token name
         string memory _symbol,                  // Token simbol
         uint256 _teamMintSupply,                // Supply for the team
-        uint256 constant _cap,                  // Max supply 
+        uint256 _cap,                           // Max supply 
         uint256 _olderUsersMintSupply,          // Supply for the older users
         uint256 _earlyAdopterMintSupply,        // Supply the users who interact with the protocol
         address[] memory _olderUsersAddresses,  // Array of older users
@@ -63,24 +64,25 @@ contract MooveToken is ERC20Capped {
         require(_teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply  <= _cap, "Initial supply exceeds cap");
         
         teamAddress = msg.sender;
+        cap = _cap;
         tokenPrice = _tokenPrice;
         _mint(msg.sender, _teamMintSupply);
         teamMintSupply = _teamMintSupply;
 
         uint256 remainingTokens;
 
-        if(_olderUsersAddresses > 0 && _olderUsersMintSupply > 0){
+        if(_olderUsersAddresses.length > 0 && _olderUsersMintSupply > 0){
             _mint(address(this), _olderUsersMintSupply);
             olderUsersMintSupply = _olderUsersMintSupply;
             
-            uint256 tokenForUser = olderUsersMintSupply / olderUsersAddresses.length;
+            uint256 tokenForUser = olderUsersMintSupply / _olderUsersAddresses.length;
             for (uint256 i = 0; i < _olderUsersAddresses.length; i++) {   
                 require(balanceOf(address(this)) >= tokenForUser, "Not enough tokens in contract");
                 _transfer(address(this),_olderUsersAddresses[i],tokenForUser);
             }
 
             if(balanceOf(address(this)) > 0){
-                remainingTokens == balanceOf(address(this));
+                remainingTokens = balanceOf(address(this));
             }
         }
         
@@ -91,10 +93,6 @@ contract MooveToken is ERC20Capped {
         if(_weeksOfVesting > 0 && _earlyAdopterMintSupply > 0){
             weeksOfVesting = _weeksOfVesting;
             earlyAdopterMintSupply = _earlyAdopterMintSupply;
-        }
-        
-        if(balanceOf(address(this)) + circulatingSupply() != _cap){
-            revert("Max supply exceeded");
         }
 
         uint256 totalMintedToken = balanceOf(address(this)) + circulatingSupply();
@@ -125,7 +123,7 @@ contract MooveToken is ERC20Capped {
 
     function claimCountdownInDays() public view activeVestingPeriod returns (uint256){
         uint256 remaningTime = (deployTimeStamp + (timestampWeek * weeksOfVesting) - block.timestamp);
-        return reminingTime / 86400;
+        return remaningTime / 86400;
     }
 
     function getTotalBalanceClaims() private {
