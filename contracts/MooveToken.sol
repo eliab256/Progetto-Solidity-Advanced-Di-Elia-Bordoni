@@ -23,6 +23,7 @@ contract MooveToken is ERC20Capped {
     //token and vesting 
     uint256 immutable cap;
     uint256 public tokenPrice;
+    uint256 public totalMintedToken;
     bool public isTradingAllowed;
     bool private vestingPeriod = false;
     bool firstCallForTotalClaims;
@@ -95,7 +96,7 @@ contract MooveToken is ERC20Capped {
             earlyAdopterMintSupply = _earlyAdopterMintSupply;
         }
 
-        uint256 totalMintedToken = balanceOf(address(this)) + circulatingSupply();
+        totalMintedToken = balanceOf(address(this)) + circulatingSupply();
         emit TokenMinting(totalMintedToken, deployTimeStamp);
     }
 
