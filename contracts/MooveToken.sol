@@ -26,10 +26,10 @@ contract MooveToken is ERC20 {
     uint256 public totalMintedToken;
     bool public isTradingAllowed;
     bool private vestingPeriod = false;
-    bool firstCallForTotalClaims;
-    
-    mapping (address => uint256) elegibleForClaims;
 
+    //mapping (address => bool) elegibleForClaims;
+    mapping (uint256 => address) elegibleForClaims; 
+    uint256 private index;   
 
 //events
     event TradingStatusChanged (bool tradingIsAllowed);
@@ -51,6 +51,7 @@ contract MooveToken is ERC20 {
         _;
     }
 
+//Constructor
     constructor(
         string memory _name,                    // Token name
         string memory _symbol,                  // Token simbol
@@ -62,7 +63,7 @@ contract MooveToken is ERC20 {
         uint8 _weeksOfVesting,                  // Duration of vesting period in weeks    
         uint256 _tokenPrice                     // price of single token 
     ) ERC20(_name, _symbol) {
-        require(_teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply  <= _cap, "Initial supply exceeds cap");
+        require(_teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply  <= _cap || _cap == 0 , "Invalid parameters");
         
         teamAddress = msg.sender;
         cap = _cap;
@@ -93,9 +94,15 @@ contract MooveToken is ERC20 {
         emit TokenMinting(totalSupply(), deployTimeStamp);
     }
 
+//functions
 
     function getCap() public view returns (uint256) {
         return cap;
+    }
+
+    function enableTrading() external onlyOwner {
+        isTradingAllowed = !isTradingAllowed; 
+        emit TradingStatusChanged(isTradingAllowed);
     }
 
     function buyToken() public payable {
@@ -105,15 +112,26 @@ contract MooveToken is ERC20 {
 
         //trasferire token al buyer, aggiornare i saldi e fare la matematica per la conversione tra token
 
-        updateElegibleAdresses(msg.sender,msg.value); //check del calcolo tra i vari token
+        updateElegibleAdresses(msg.sender);
     }
 
-    function updateElegibleAdresses(address _buyerAddress, uint256 _buyerAmount) private activeVestingPeriod {
-        elegibleForClaims[_buyerAddress] += _buyerAmount;
+    function updateElegibleAdresses(address _buyerAddress) private activeVestingPeriod {
+        for(uint256 i=0; i < index; i++){
+            if(elegibleForClaims[i] == _buyerAddress) {
+                revert("Address already registered");
+            } 
+        }
+        elegibleForClaims[index] = _buyerAddress;
+        index++;
+     
     }
 
-    function checkEligibilityClaim() public view activeVestingPeriod returns (bool){ //aggiungere il ritorno della quantità dei possibili token da prelevare dall' utente
-        if(elegibleForClaims[msg.sender] > 0) {
+    
+
+
+
+    function checkEligibilityClaim() public view activeVestingPeriod returns (bool){
+        if(balanceOf(msg.sender) > 0) {
             return true;
             } else return false;
     }
@@ -123,26 +141,29 @@ contract MooveToken is ERC20 {
         return remaningTime / 86400;
     }
 
-    function getTotalBalanceClaims() private {
-        if(firstCallForTotalClaims == true){
-            firstCallForTotalClaims = false;
-        }
+    function calculateTotalBalanceClaims() private onlyOwner{
+        require(vestingPeriod == false, "Vesting period isn't ended");
+
+        //qua fa lo snapshot dei saldi dei contratti andando a sommare tutti i valori dei vari address facendo il for degli index
+        
     }
 
     function vestingTokenClaims() public {
         require(vestingPeriod == false, "Vesting period isn't ended");
-        require(elegibleForClaims[msg.sender] > 0, "You aren' t eligible for the claim");
+        require(balanceOf(msg.sender) > 0, "You aren' t eligible for the claim");
         
-        getTotalBalanceClaims();
+        calculateTotalBalanceClaims();
         //capire come "salvare" il totale dei saldi solo la prima volta per distribuire i token in base al volume scambiato
 
 
     }
 
-    function enableTrading() external onlyOwner {
-        isTradingAllowed = !isTradingAllowed; 
-        emit TradingStatusChanged(isTradingAllowed);
-    }
 
+  // function updateElegibleAdresses(address _buyerAddress) private activeVestingPeriod {
+  //      if(elegibleForClaims[_buyerAddress]) {
+  //              revert("Address already registered");
+   //         }       
+  //      elegibleForClaims[_buyerAddress] = true;
+  //  }
     
 }
