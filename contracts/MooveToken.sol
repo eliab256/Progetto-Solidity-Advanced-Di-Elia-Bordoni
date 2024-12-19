@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.28;
 
-import {ERC20Capped} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract MooveToken is ERC20Capped {
+contract MooveToken is ERC20 {
 
 //variables declaration
 
@@ -21,7 +21,7 @@ contract MooveToken is ERC20Capped {
     address public immutable teamAddress;
 
     //token and vesting 
-    uint256 immutable cap;
+    uint256 private immutable cap;
     uint256 public tokenPrice;
     uint256 public totalMintedToken;
     bool public isTradingAllowed;
@@ -41,8 +41,8 @@ contract MooveToken is ERC20Capped {
         _;
     }
     
-    modifier maxSupplyNotReached(){
-        require(circulatingSupply() + balanceOf(address(this)) < cap, "Max supply reached");
+    modifier maxSupplyNotReached(uint256 _amount){
+        require(totalSupply() + _amount <= cap, "Max supply reached");
         _;
     }
 
@@ -61,7 +61,7 @@ contract MooveToken is ERC20Capped {
         address[] memory _olderUsersAddresses,  // Array of older users
         uint8 _weeksOfVesting,                  // Duration of vesting period in weeks    
         uint256 _tokenPrice                     // price of single token 
-    ) ERC20(_name, _symbol) ERC20Capped(_cap) {
+    ) ERC20(_name, _symbol) {
         require(_teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply  <= _cap, "Initial supply exceeds cap");
         
         teamAddress = msg.sender;
@@ -69,8 +69,6 @@ contract MooveToken is ERC20Capped {
         tokenPrice = _tokenPrice;
         _mint(msg.sender, _teamMintSupply);
         teamMintSupply = _teamMintSupply;
-
-        uint256 remainingTokens;
 
         if(_olderUsersAddresses.length > 0 && _olderUsersMintSupply > 0){
             _mint(address(this), _olderUsersMintSupply);
@@ -81,13 +79,9 @@ contract MooveToken is ERC20Capped {
                 require(balanceOf(address(this)) >= tokenForUser, "Not enough tokens in contract");
                 _transfer(address(this),_olderUsersAddresses[i],tokenForUser);
             }
-
-            if(balanceOf(address(this)) > 0){
-                remainingTokens = balanceOf(address(this));
-            }
         }
         
-        _mint(address(this), _cap - circulatingSupply() - remainingTokens);
+        _mint(address(this), _cap - totalSupply());
 
         deployTimeStamp = block.timestamp / 86400 * 86400;
 
@@ -96,11 +90,13 @@ contract MooveToken is ERC20Capped {
             earlyAdopterMintSupply = _earlyAdopterMintSupply;
         }
 
-        totalMintedToken = balanceOf(address(this)) + circulatingSupply();
-        emit TokenMinting(totalMintedToken, deployTimeStamp);
+        emit TokenMinting(totalSupply(), deployTimeStamp);
     }
 
 
+    function getCap() public view returns (uint256) {
+        return cap;
+    }
 
     function buyToken() public payable {
         require(msg.value > 0, "Insufficient funds");
@@ -117,7 +113,7 @@ contract MooveToken is ERC20Capped {
     }
 
     function checkEligibilityClaim() public view activeVestingPeriod returns (bool){ //aggiungere il ritorno della quantità dei possibili token da prelevare dall' utente
-        if(eligibleForVesting[msg.sender] > 0) {
+        if(elegibleForClaims[msg.sender] > 0) {
             return true;
             } else return false;
     }
@@ -135,7 +131,7 @@ contract MooveToken is ERC20Capped {
 
     function vestingTokenClaims() public {
         require(vestingPeriod == false, "Vesting period isn't ended");
-        require(eligibleForVesting[msg.sender] > 0, "You aren' t eligible for the claim");
+        require(elegibleForClaims[msg.sender] > 0, "You aren' t eligible for the claim");
         
         getTotalBalanceClaims();
         //capire come "salvare" il totale dei saldi solo la prima volta per distribuire i token in base al volume scambiato
