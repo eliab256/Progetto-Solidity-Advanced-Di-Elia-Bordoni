@@ -3,6 +3,7 @@
 pragma solidity ^0.8.28;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract MooveToken is ERC20 {
 
@@ -100,6 +101,21 @@ contract MooveToken is ERC20 {
         return cap;
     }
 
+    function getPrice() public view returns (uint256){
+        return tokenPrice;
+    }
+   
+    function checkEligibilityClaim() public view activeVestingPeriod returns (bool){
+        if(balanceOf(msg.sender) > 0) {
+            return true;
+            } else return false;
+    }
+
+    function claimCountdownInDays() public view activeVestingPeriod returns (uint256){
+        uint256 remaningTime = (deployTimeStamp + (timestampWeek * weeksOfVesting) - block.timestamp);
+        return remaningTime / 86400;
+    }
+
     function enableTrading() external onlyOwner {
         isTradingAllowed = !isTradingAllowed; 
         emit TradingStatusChanged(isTradingAllowed);
@@ -124,22 +140,7 @@ contract MooveToken is ERC20 {
         elegibleForClaims[index] = _buyerAddress;
         index++;
      
-    }
-
-    
-
-
-
-    function checkEligibilityClaim() public view activeVestingPeriod returns (bool){
-        if(balanceOf(msg.sender) > 0) {
-            return true;
-            } else return false;
-    }
-
-    function claimCountdownInDays() public view activeVestingPeriod returns (uint256){
-        uint256 remaningTime = (deployTimeStamp + (timestampWeek * weeksOfVesting) - block.timestamp);
-        return remaningTime / 86400;
-    }
+    }   
 
     function calculateTotalBalanceClaims() private onlyOwner{
         require(vestingPeriod == false, "Vesting period isn't ended");
@@ -155,6 +156,17 @@ contract MooveToken is ERC20 {
         calculateTotalBalanceClaims();
         //capire come "salvare" il totale dei saldi solo la prima volta per distribuire i token in base al volume scambiato
 
+
+    }
+
+
+
+
+    function getExternalPrice() public {
+
+    }
+
+    function getConversionRate() public {
 
     }
 
