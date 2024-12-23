@@ -4,8 +4,9 @@ pragma solidity ^0.8.28;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract MooveToken is ERC20 {
+contract MooveToken is ERC20, ReentrancyGuard {
 
 //variables declaration
 
@@ -71,8 +72,8 @@ contract MooveToken is ERC20 {
         teamAddress = msg.sender;
         cap = _cap;
         tokenPrice = _tokenPrice;
-        _mint(msg.sender, _teamMintSupply);
         teamMintSupply = _teamMintSupply;
+        _mint(msg.sender, teamMintSupply);
 
         if(_olderUsersAddresses.length > 0 && _olderUsersMintSupply > 0){
             _mint(address(this), _olderUsersMintSupply);
@@ -82,8 +83,6 @@ contract MooveToken is ERC20 {
             for (uint256 i = 0; i < _olderUsersAddresses.length; i++) {   
                 require(balanceOf(address(this)) >= tokenForUser, "Not enough tokens in contract");
                 _transfer(address(this),_olderUsersAddresses[i],tokenForUser);
-
-                emit Transfer (address(this),_olderUsersAddresses[i],tokenForUser);
             }
         }
         
@@ -177,8 +176,6 @@ contract MooveToken is ERC20 {
         }
         
         _transfer(address(this),msg.sender,claimsAmountForAddress[msg.sender]);
-        emit Transfer (address(this), msg.sender,claimsAmountForAddress[msg.sender]);
-
     }
 
 
@@ -194,12 +191,4 @@ contract MooveToken is ERC20 {
         uint256 ethPrice = getEthPrice();
     }
 
-
-  // function updateElegibleAdresses(address _buyerAddress) private activeVestingPeriod {
-  //      if(elegibleForClaims[_buyerAddress]) {
-  //              revert("Address already registered");
-   //         }       
-  //      elegibleForClaims[_buyerAddress] = true;
-  //  }
-    
 }
