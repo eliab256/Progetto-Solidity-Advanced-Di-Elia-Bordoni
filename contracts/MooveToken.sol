@@ -145,7 +145,22 @@ contract MooveToken is ERC20 {
     function calculateTotalBalanceClaims() private onlyOwner{
         require(vestingPeriod == false, "Vesting period isn't ended");
 
-        //qua fa lo snapshot dei saldi dei contratti andando a sommare tutti i valori dei vari address facendo il for degli index
+        uint256 totalBalance;
+
+        for(uint256 i=0; i < index; i++){
+            address user = elegibleForClaims[i];
+            if (user != address(0)) { 
+            totalBalance += balanceOf(user);
+            }
+        }
+
+        for(uint256 i=0; i < index; i++){
+            address user = elegibleForClaims[i];
+            if (user != address(0) || balanceOf(user) != 0) { 
+            uint256 userClaim = earlyAdopterMintSupply *  balanceOf(user) / totalBalance;
+            _transfer(address(this),elegibleForClaims[i],userClaim);
+            }
+        }
         
     }
 
@@ -162,12 +177,14 @@ contract MooveToken is ERC20 {
 
 
 
-    function getExternalPrice() public {
-
+    function getEthPrice() public view returns(uint256){
+        AggregatorV3Interface dataFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306);
+        (,int256 answer,,,) = dataFeed.latestRoundData();
+        return uint256(answer * 1e10);
     }
 
-    function getConversionRate() public {
-
+    function getConversionRate(uint256 _tokenAmount) public view returns(uint256){
+        uint256 ethPrice = getEthPrice();
     }
 
 
