@@ -30,11 +30,13 @@ contract MooveToken is ERC20 {
 
     //mapping (address => bool) elegibleForClaims;
     mapping (uint256 => address) elegibleForClaims; 
+    mapping (address => uint256) claimsAmountForAddress;
     uint256 private index;   
 
 //events
     event TradingStatusChanged (bool tradingIsAllowed);
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
+    event Claimed (address indexed claimant, uint256 amount);
 
 //Modifiers
     modifier onlyOwner() {
@@ -80,6 +82,8 @@ contract MooveToken is ERC20 {
             for (uint256 i = 0; i < _olderUsersAddresses.length; i++) {   
                 require(balanceOf(address(this)) >= tokenForUser, "Not enough tokens in contract");
                 _transfer(address(this),_olderUsersAddresses[i],tokenForUser);
+
+                emit Transfer (address(this),_olderUsersAddresses[i],tokenForUser);
             }
         }
         
@@ -129,6 +133,8 @@ contract MooveToken is ERC20 {
         //trasferire token al buyer, aggiornare i saldi e fare la matematica per la conversione tra token
 
         updateElegibleAdresses(msg.sender);
+
+        //emit Transfer (address(this),msg.sender,amount);
     }
 
     function updateElegibleAdresses(address _buyerAddress) private activeVestingPeriod {
@@ -157,8 +163,8 @@ contract MooveToken is ERC20 {
         for(uint256 i=0; i < index; i++){
             address user = elegibleForClaims[i];
             if (user != address(0) || balanceOf(user) != 0) { 
-            uint256 userClaim = earlyAdopterMintSupply *  balanceOf(user) / totalBalance;
-            _transfer(address(this),elegibleForClaims[i],userClaim);
+            uint256 userClaimAmount = earlyAdopterMintSupply *  balanceOf(user) / totalBalance;
+            claimsAmountForAddress[user] = userClaimAmount;          
             }
         }
         
@@ -166,11 +172,12 @@ contract MooveToken is ERC20 {
 
     function vestingTokenClaims() public {
         require(vestingPeriod == false, "Vesting period isn't ended");
-        require(balanceOf(msg.sender) > 0, "You aren' t eligible for the claim");
+        if(claimsAmountForAddress[msg.sender] == 0){
+            revert("You are not eligible for the claim");
+        }
         
-        calculateTotalBalanceClaims();
-        //capire come "salvare" il totale dei saldi solo la prima volta per distribuire i token in base al volume scambiato
-
+        _transfer(address(this),msg.sender,claimsAmountForAddress[msg.sender]);
+        emit Transfer (address(this), msg.sender,claimsAmountForAddress[msg.sender]);
 
     }
 
