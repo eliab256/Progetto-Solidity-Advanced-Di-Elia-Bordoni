@@ -133,7 +133,7 @@ contract MooveToken is ERC20, ReentrancyGuard {
 
         updateElegibleAdresses(msg.sender);
 
-        //emit Transfer (address(this),msg.sender,amount);
+        //inviare i fondi ricevuti al contratto della treasury
     }
 
     function updateElegibleAdresses(address _buyerAddress) private activeVestingPeriod {
@@ -147,7 +147,7 @@ contract MooveToken is ERC20, ReentrancyGuard {
      
     }   
 
-    function calculateTotalBalanceClaims() private onlyOwner{
+    function getTotalBalanceClaims() private onlyOwner{
         require(vestingPeriod == false, "Vesting period isn't ended");
 
         uint256 totalBalance;
