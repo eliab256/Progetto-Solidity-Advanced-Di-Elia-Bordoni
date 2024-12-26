@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.28;
 
-//import {MooveToken} from "../MooveToken.sol";
+import {GovernanceToken} from "./GovernanceToken.sol";
 
 contract MooveGovernance {
     

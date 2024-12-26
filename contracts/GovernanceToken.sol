@@ -11,19 +11,19 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 //variables declaration
 
     //about time
-    uint256 public immutable deployTimeStamp;
-    uint256 private constant timestampWeek = 604800;
-    uint8 private immutable weeksOfVesting;
+    uint256 public immutable i_deployTimeStamp;
+    uint256 private constant i_timestampWeek = 604800;
+    uint8 private immutable i_weeksOfVesting;
     
     //minting sessions
-    uint256 public immutable teamMintSupply;    
-    uint256 public immutable olderUsersMintSupply;    
-    uint256 public immutable earlyAdopterMintSupply;  
+    uint256 private immutable i_teamMintSupply;    
+    uint256 private immutable i_olderUsersMintSupply;    
+    uint256 private immutable i_earlyAdopterMintSupply;  
     
-    address public immutable teamAddress;
+    address public immutable i_teamAddress;
 
     //token and vesting 
-    uint256 private immutable cap;
+    uint256 private immutable i_cap;
     uint256 public tokenPrice;
     uint256 public totalMintedToken;
     bool public isTradingAllowed;
@@ -55,13 +55,13 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
 //Modifiers
     modifier onlyOwner() {
-        if(msg.sender != teamAddress){ revert GovernanceToken__NotOwner();}
+        if(msg.sender != i_teamAddress){ revert GovernanceToken__NotOwner();}
         _;
     }
     
     modifier maxSupplyNotReached(uint256 _amount){
-        if(totalSupply() + (_amount * 10 ** decimals()) > (cap * 10 ** decimals())) {
-            revert GovernanceToken__MaxSupplyReached(totalSupply()/1e18, cap);}
+        if(totalSupply() + (_amount * 10 ** decimals()) > (i_cap * 10 ** decimals())) {
+            revert GovernanceToken__MaxSupplyReached(totalSupply()/1e18, i_cap);}
         _;
     }
 
@@ -92,35 +92,35 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         if(_cap == 0){revert GovernanceToken__CapMustBeGreaterThanZero();}
         if(_tokenPrice == 0){revert GovernanceToken__TokenPriceMustBeGreaterThanZero();}
 
-        teamAddress = msg.sender;
-        cap = _cap;
+        i_teamAddress = msg.sender;
+        i_cap = _cap;
         tokenPrice = _tokenPrice;
         if(_teamMintSupply > 0){
-            teamMintSupply = _teamMintSupply;
-            _mint(msg.sender, teamMintSupply * 10 ** decimals());
+            i_teamMintSupply = _teamMintSupply;
+            _mint(msg.sender, i_teamMintSupply * 10 ** decimals());
             }
 
         if(_olderUsersAddresses.length > 0 && _olderUsersMintSupply > 0){
             _mint(address(this), _olderUsersMintSupply * 10 ** decimals());
-            olderUsersMintSupply = _olderUsersMintSupply;
+            i_olderUsersMintSupply = _olderUsersMintSupply;
             
-            uint256 tokenForUser = olderUsersMintSupply / _olderUsersAddresses.length;
+            uint256 tokenForUser = i_olderUsersMintSupply / _olderUsersAddresses.length;
             for (uint256 i = 0; i < _olderUsersAddresses.length; i++) {   
                 require(balanceOf(address(this)) >= tokenForUser, "Not enough tokens in contract");
                 _transfer(address(this),_olderUsersAddresses[i],tokenForUser);
             }
         }
         
-        _mint(address(this), (cap * 10 ** decimals())- totalSupply());
+        _mint(address(this), (i_cap * 10 ** decimals())- totalSupply());
 
-        deployTimeStamp = block.timestamp / 86400 * 86400;
+        i_deployTimeStamp = block.timestamp / 86400 * 86400;
 
         if(_weeksOfVesting > 0 && _earlyAdopterMintSupply > 0){
-            weeksOfVesting = _weeksOfVesting;
-            earlyAdopterMintSupply = _earlyAdopterMintSupply;
+            i_weeksOfVesting = _weeksOfVesting;
+            i_earlyAdopterMintSupply = _earlyAdopterMintSupply;
         }
 
-        emit TokenMinting(totalSupply(), deployTimeStamp);
+        emit TokenMinting(totalSupply(), i_deployTimeStamp);
     }
 
 //functions
@@ -130,7 +130,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
     function getCap() public view returns (uint256) {
-        return cap;
+        return i_cap;
     }
 
     function getPrice() public view returns (uint256){
@@ -144,7 +144,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
     function claimCountdownInDays() public view activeVestingPeriod returns (uint256){
-        uint256 remaningTime = (deployTimeStamp + (timestampWeek * weeksOfVesting) - block.timestamp);
+        uint256 remaningTime = (i_deployTimeStamp + (i_timestampWeek * i_weeksOfVesting) - block.timestamp);
         return remaningTime / 86400;
     }
 
@@ -191,7 +191,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         for(uint256 i=0; i < index; i++){
             address user = elegibleForClaims[i];
             if (user != address(0) || balanceOf(user) != 0) { 
-            uint256 userClaimAmount = earlyAdopterMintSupply *  balanceOf(user) / totalBalance;
+            uint256 userClaimAmount = i_earlyAdopterMintSupply *  balanceOf(user) / totalBalance;
             claimsAmountForAddress[user] = userClaimAmount;          
             }
         }
