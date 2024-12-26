@@ -23,8 +23,19 @@ contract MooveGovernance {
         uint256 proposalIndex;
         address proposer;
         string proposalDescription;
-        bool isPassed;
+        uint256 endVotingTimestamp;
+        bool isApproved;
+        bool isFinalized;
         ProposalVoteResult voteResults;
+    }
+
+    address teamAddress;
+
+    constructor(){
+        teamAddress = msg.sender;
+    }
+
+    function makeProposal() external {
 
     }
 }

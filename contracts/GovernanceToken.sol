@@ -6,19 +6,19 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract MooveToken is ERC20, ReentrancyGuard {
+contract GovernanceToken is ERC20, ReentrancyGuard {
 
 //variables declaration
 
     //about time
-    uint256 public deployTimeStamp;
-    uint256 private timestampWeek = 604800;
-    uint8 private weeksOfVesting;
+    uint256 public immutable deployTimeStamp;
+    uint256 private constant timestampWeek = 604800;
+    uint8 private immutable weeksOfVesting;
     
     //minting sessions
-    uint256 public teamMintSupply;    
-    uint256 public olderUsersMintSupply;    
-    uint256 public earlyAdopterMintSupply;  
+    uint256 public immutable teamMintSupply;    
+    uint256 public immutable olderUsersMintSupply;    
+    uint256 public immutable earlyAdopterMintSupply;  
     
     address public immutable teamAddress;
 
@@ -39,19 +39,39 @@ contract MooveToken is ERC20, ReentrancyGuard {
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
     event Claimed (address indexed claimant, uint256 amount);
 
+//Custom Errors
+
+    error GovernanceToken__NotOwner();
+    error GovernanceToken__NotEnoughTokens(uint256);
+    error GovernanceToken__MaxSupplyReached(uint256 _supply, uint256 __cap);
+    error GovernanceToken__VestingPeriodNotActive();
+    error GovernanceToken__VestingPeriodIsActive();
+    error GovernanceToken__CapMustBeGreaterThanZero();
+    error GovernanceToken__TokenPriceMustBeGreaterThanZero();
+    error GovernanceToken__TradingIsNotAllowed();
+    error GovernanceToken__InsufficientBalance();
+    error GovernanceToken__InsufficientAmountOfTokenOnContract(uint256 _requestAmount, uint256 _tokenOnContractAmount);
+
+
 //Modifiers
     modifier onlyOwner() {
-        require(msg.sender == teamAddress, "Not authorized");
+        if(msg.sender != teamAddress){ revert GovernanceToken__NotOwner();}
         _;
     }
     
     modifier maxSupplyNotReached(uint256 _amount){
-        require(totalSupply() + _amount <= cap, "Max supply reached");
+        if(totalSupply() + (_amount * 10 ** decimals()) > (cap * 10 ** decimals())) {
+            revert GovernanceToken__MaxSupplyReached(totalSupply()/1e18, cap);}
         _;
     }
 
     modifier activeVestingPeriod(){
-        require(vestingPeriod == true,"there is not a vesting period active");
+     if(vestingPeriod == false){revert GovernanceToken__VestingPeriodNotActive();}
+        _;
+    }
+
+    modifier inactiveVestingPeriod(){
+        if(vestingPeriod == true){revert GovernanceToken__VestingPeriodIsActive();}
         _;
     }
 
@@ -67,16 +87,21 @@ contract MooveToken is ERC20, ReentrancyGuard {
         uint8 _weeksOfVesting,                  // Duration of vesting period in weeks    
         uint256 _tokenPrice                     // price of single token 
     ) ERC20(_name, _symbol) {
-        require(_teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply  <= _cap || _cap == 0 , "Invalid parameters");
-        
+        uint256 totalInitalMint = _teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply;
+        if(totalInitalMint > _cap){revert GovernanceToken__MaxSupplyReached(totalInitalMint, _cap);}
+        if(_cap == 0){revert GovernanceToken__CapMustBeGreaterThanZero();}
+        if(_tokenPrice == 0){revert GovernanceToken__TokenPriceMustBeGreaterThanZero();}
+
         teamAddress = msg.sender;
         cap = _cap;
         tokenPrice = _tokenPrice;
-        teamMintSupply = _teamMintSupply;
-        _mint(msg.sender, teamMintSupply);
+        if(_teamMintSupply > 0){
+            teamMintSupply = _teamMintSupply;
+            _mint(msg.sender, teamMintSupply * 10 ** decimals());
+            }
 
         if(_olderUsersAddresses.length > 0 && _olderUsersMintSupply > 0){
-            _mint(address(this), _olderUsersMintSupply);
+            _mint(address(this), _olderUsersMintSupply * 10 ** decimals());
             olderUsersMintSupply = _olderUsersMintSupply;
             
             uint256 tokenForUser = olderUsersMintSupply / _olderUsersAddresses.length;
@@ -86,7 +111,7 @@ contract MooveToken is ERC20, ReentrancyGuard {
             }
         }
         
-        _mint(address(this), _cap - totalSupply());
+        _mint(address(this), (cap * 10 ** decimals())- totalSupply());
 
         deployTimeStamp = block.timestamp / 86400 * 86400;
 
@@ -99,6 +124,10 @@ contract MooveToken is ERC20, ReentrancyGuard {
     }
 
 //functions
+
+    function decimals() public pure override returns (uint8) {
+        return 18;
+    }
 
     function getCap() public view returns (uint256) {
         return cap;
@@ -125,9 +154,11 @@ contract MooveToken is ERC20, ReentrancyGuard {
     }
 
     function buyToken() public payable {
-        require(msg.value > 0, "Insufficient funds");
-        require(msg.value < balanceOf(address(this)), "there is no enough token on the contract");
-        require(isTradingAllowed == true, "team doesn't allolow trading");
+        if(msg.value <= 0) {revert GovernanceToken__InsufficientBalance();}
+        if(msg.value > balanceOf(address(this))){
+            revert GovernanceToken__InsufficientAmountOfTokenOnContract(msg.value, balanceOf(address(this)));
+            }
+        if(isTradingAllowed == false){revert GovernanceToken__TradingIsNotAllowed();}
 
         //trasferire token al buyer, aggiornare i saldi e fare la matematica per la conversione tra token
 
@@ -147,9 +178,7 @@ contract MooveToken is ERC20, ReentrancyGuard {
      
     }   
 
-    function getTotalBalanceClaims() private onlyOwner{
-        require(vestingPeriod == false, "Vesting period isn't ended");
-
+    function getTotalBalanceClaims() private onlyOwner inactiveVestingPeriod{
         uint256 totalBalance;
 
         for(uint256 i=0; i < index; i++){
@@ -169,8 +198,7 @@ contract MooveToken is ERC20, ReentrancyGuard {
         
     }
 
-    function vestingTokenClaims() public {
-        require(vestingPeriod == false, "Vesting period isn't ended");
+    function vestingTokenClaims() public inactiveVestingPeriod {
         if(claimsAmountForAddress[msg.sender] == 0){
             revert("You are not eligible for the claim");
         }
