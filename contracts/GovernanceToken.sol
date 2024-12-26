@@ -20,7 +20,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     uint256 private immutable i_olderUsersMintSupply;    
     uint256 private immutable i_earlyAdopterMintSupply;  
     
-    address public immutable i_teamAddress;
+    address public immutable i_Owner;
 
     //token and vesting 
     uint256 private immutable i_cap;
@@ -55,7 +55,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
 //Modifiers
     modifier onlyOwner() {
-        if(msg.sender != i_teamAddress){ revert GovernanceToken__NotOwner();}
+        if(msg.sender != i_Owner){ revert GovernanceToken__NotOwner();}
         _;
     }
     
@@ -92,7 +92,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         if(_cap == 0){revert GovernanceToken__CapMustBeGreaterThanZero();}
         if(_tokenPrice == 0){revert GovernanceToken__TokenPriceMustBeGreaterThanZero();}
 
-        i_teamAddress = msg.sender;
+        i_Owner = msg.sender;
         i_cap = _cap;
         tokenPrice = _tokenPrice;
         if(_teamMintSupply > 0){
