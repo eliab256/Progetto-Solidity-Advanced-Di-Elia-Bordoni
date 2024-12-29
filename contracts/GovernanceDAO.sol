@@ -4,10 +4,13 @@ pragma solidity ^0.8.28;
 
 import {GovernanceToken} from "./GovernanceToken.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {TreasuryDAO} from "./TreasuryDAO.sol";
 
-contract GovernanceDAO {
+contract GovernanceDAO is ReentrancyGuard{
 
     GovernanceToken public MooveToken;
+    TreasuryDAO public MooveTreasury;
 
 //errors
     error GovernanceDAO__NotEnoughtTokenToVote(uint256 _tokenYouHave, uint256 _tokenYouNeed);
@@ -89,6 +92,8 @@ contract GovernanceDAO {
 
         i_tokenContractAddress = address(MooveToken);
         i_teamAddress = msg.sender;
+
+        MooveTreasury = new TreasuryDAO(i_teamAddress, address(this));
         minimumTokenToMakeAProposal = _minimumTokenToMakeAProposal;
     }
 
@@ -131,10 +136,13 @@ contract GovernanceDAO {
             revert GovernanceDAO__InsufficientAmountOfTokenOnContract(msg.value, MooveToken.balanceOf(address(this)));
         }
         
+        uint256 tokenPriceWithDecimals = tokenPrice * 10 ** MooveToken.decimals(); 
+        uint256 ethAmountInUsd = getConversionRate(msg.value);
+        uint256 amountToSend = ethAmountInUsd / tokenPriceWithDecimals;
 
-        //trasferire token al buyer, aggiornare i saldi e fare la matematica per la conversione tra token
+        MooveToken.sendingToken(address(this), msg.sender, amountToSend);
 
-        //MooveToken.updateElegibleAdresses(msg.sender);
+        MooveToken.updateElegibleAdresses(msg.sender);
 
         //inviare i fondi ricevuti al contratto della treasury
     }
@@ -145,8 +153,10 @@ contract GovernanceDAO {
         return uint256(answer * 1e10);
     }
 
-    function getConversionRate(uint256 _tokenAmount) public view returns(uint256){
+    function getConversionRate(uint256 _ethAmount) public view returns(uint256){
         uint256 ethPrice = getEthPrice();
+        uint256 ethAmountInUsd = (ethPrice * _ethAmount) / 1e18;
+        return ethAmountInUsd;
     }
 
 
