@@ -3,7 +3,6 @@
 pragma solidity ^0.8.28;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract GovernanceToken is ERC20, ReentrancyGuard {
@@ -20,13 +19,15 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     uint256 private immutable i_olderUsersMintSupply;    
     uint256 private immutable i_earlyAdopterMintSupply;  
     
+    //special addresses
     address public immutable i_Owner;
+    address public immutable i_DAO;
 
     //token and vesting 
     uint256 private immutable i_cap;
     uint256 public tokenPrice;
     uint256 public totalMintedToken;
-    bool public isTradingAllowed;
+    
     bool private vestingPeriod = false;
 
     //mapping (address => bool) elegibleForClaims;
@@ -35,27 +36,31 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     uint256 private index;   
 
 //events
-    event TradingStatusChanged (bool tradingIsAllowed);
+    
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
     event Claimed (address indexed claimant, uint256 amount);
 
 //Custom Errors
 
     error GovernanceToken__NotOwner();
+    error GovernanceToken__NotDAO();
     error GovernanceToken__NotEnoughTokens(uint256);
     error GovernanceToken__MaxSupplyReached(uint256 _supply, uint256 __cap);
     error GovernanceToken__VestingPeriodNotActive();
     error GovernanceToken__VestingPeriodIsActive();
     error GovernanceToken__CapMustBeGreaterThanZero();
     error GovernanceToken__TokenPriceMustBeGreaterThanZero();
-    error GovernanceToken__TradingIsNotAllowed();
     error GovernanceToken__InsufficientBalance();
-    error GovernanceToken__InsufficientAmountOfTokenOnContract(uint256 _requestAmount, uint256 _tokenOnContractAmount);
 
 
 //Modifiers
     modifier onlyOwner() {
         if(msg.sender != i_Owner){ revert GovernanceToken__NotOwner();}
+        _;
+    }
+
+    modifier onlyDAO(){
+        if(msg.sender != i_DAO){revert GovernanceToken__NotDAO();}
         _;
     }
     
@@ -79,6 +84,8 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     constructor(
         string memory _name,                    // Token name
         string memory _symbol,                  // Token simbol
+        address _teamAddress,                   // team's address
+        address _DAOAddress,                    // DAO' s address 
         uint256 _teamMintSupply,                // Supply for the team
         uint256 _cap,                           // Max supply 
         uint256 _olderUsersMintSupply,          // Supply for the older users
@@ -92,14 +99,18 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         if(_cap == 0){revert GovernanceToken__CapMustBeGreaterThanZero();}
         if(_tokenPrice == 0){revert GovernanceToken__TokenPriceMustBeGreaterThanZero();}
 
-        i_Owner = msg.sender;
+        i_Owner = _teamAddress;
+        i_DAO = _DAOAddress;
         i_cap = _cap;
         tokenPrice = _tokenPrice;
+
+        //sending tokens to the team
         if(_teamMintSupply > 0){
             i_teamMintSupply = _teamMintSupply;
-            _mint(msg.sender, i_teamMintSupply * 10 ** decimals());
+            _mint(_teamAddress, i_teamMintSupply * 10 ** decimals());
             }
 
+        //sending tokens to older users
         if(_olderUsersAddresses.length > 0 && _olderUsersMintSupply > 0){
             _mint(address(this), _olderUsersMintSupply * 10 ** decimals());
             i_olderUsersMintSupply = _olderUsersMintSupply;
@@ -119,6 +130,8 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
             i_weeksOfVesting = _weeksOfVesting;
             i_earlyAdopterMintSupply = _earlyAdopterMintSupply;
         }
+
+        _transfer(address(this),i_DAO,balanceOf(address(this)) - i_earlyAdopterMintSupply * 10 ** decimals());
 
         emit TokenMinting(totalSupply(), i_deployTimeStamp);
     }
@@ -146,25 +159,6 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     function claimCountdownInDays() public view activeVestingPeriod returns (uint256){
         uint256 remaningTime = (i_deployTimeStamp + (i_timestampWeek * i_weeksOfVesting) - block.timestamp);
         return remaningTime / 86400;
-    }
-
-    function enableTrading() external onlyOwner {
-        isTradingAllowed = !isTradingAllowed; 
-        emit TradingStatusChanged(isTradingAllowed);
-    }
-
-    function buyToken() public payable {
-        if(msg.value <= 0) {revert GovernanceToken__InsufficientBalance();}
-        if(msg.value > balanceOf(address(this))){
-            revert GovernanceToken__InsufficientAmountOfTokenOnContract(msg.value, balanceOf(address(this)));
-            }
-        if(isTradingAllowed == false){revert GovernanceToken__TradingIsNotAllowed();}
-
-        //trasferire token al buyer, aggiornare i saldi e fare la matematica per la conversione tra token
-
-        updateElegibleAdresses(msg.sender);
-
-        //inviare i fondi ricevuti al contratto della treasury
     }
 
     function updateElegibleAdresses(address _buyerAddress) private activeVestingPeriod {
@@ -207,16 +201,5 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
 
-
-
-    function getEthPrice() public view returns(uint256){
-        AggregatorV3Interface dataFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306);
-        (,int256 answer,,,) = dataFeed.latestRoundData();
-        return uint256(answer * 1e10);
-    }
-
-    function getConversionRate(uint256 _tokenAmount) public view returns(uint256){
-        uint256 ethPrice = getEthPrice();
-    }
 
 }
