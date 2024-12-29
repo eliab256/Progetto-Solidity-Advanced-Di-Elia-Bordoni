@@ -3,7 +3,6 @@
 pragma solidity ^0.8.28;
 
 import {GovernanceToken} from "./GovernanceToken.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract GovernanceDAO {
@@ -16,10 +15,13 @@ contract GovernanceDAO {
     error GovernanceDAO__TradingIsNotAllowed();
     error GovernanceDAO__InsufficientBalance();
     error GovernanceDAO__InsufficientAmountOfTokenOnContract(uint256 _requestAmount, uint256 _tokenOnContractAmount);
+    error GovernanceDAO__NotOwner();
 
 //modifiers
-
-
+    modifier onlyOwner() {
+        if(msg.sender != i_teamAddress){ revert GovernanceDAO__NotOwner();}
+        _;
+    }
 //structs and Enum  
     enum ProposalVoteOptions{
         InFavor,
@@ -53,6 +55,7 @@ contract GovernanceDAO {
     uint256 public minimumTokenToMakeAProposal;
     uint256 internal proposalIndexCounter;
     bool public isTradingAllowed;
+    uint256 public tokenPrice = MooveToken.getPrice();
 
 //event
     event ProposalCreated(address indexed _proposer, uint256 indexed _proposalIndex);
@@ -116,21 +119,22 @@ contract GovernanceDAO {
         emit ProposalCreated(newProposal.proposer, newProposal.proposalIndex);
     } 
     
-   // function enableTrading() external onlyOwner {
-   //     isTradingAllowed = !isTradingAllowed; 
-   //     emit TradingStatusChanged(isTradingAllowed);
-   // }
+    function enableTrading() external onlyOwner {
+        isTradingAllowed = !isTradingAllowed; 
+        emit TradingStatusChanged(isTradingAllowed);
+    }
 
     function buyToken() public payable {
+        if(isTradingAllowed == false){revert GovernanceDAO__TradingIsNotAllowed();}
         if(msg.value <= 0) {revert GovernanceDAO__InsufficientBalance();}
-       // if(msg.value > balanceOf(address(this))){
-       //     revert GovernanceDAO__InsufficientAmountOfTokenOnContract(msg.value, balanceOf(address(this)));
-            //}
-       //if(isTradingAllowed == false){revert GovernanceToken__TradingIsNotAllowed();}
+        if(msg.value > MooveToken.balanceOf(address(this))){
+            revert GovernanceDAO__InsufficientAmountOfTokenOnContract(msg.value, MooveToken.balanceOf(address(this)));
+        }
+        
 
         //trasferire token al buyer, aggiornare i saldi e fare la matematica per la conversione tra token
 
-        //updateElegibleAdresses(msg.sender);
+        //MooveToken.updateElegibleAdresses(msg.sender);
 
         //inviare i fondi ricevuti al contratto della treasury
     }

@@ -161,7 +161,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         return remaningTime / 86400;
     }
 
-    function updateElegibleAdresses(address _buyerAddress) private activeVestingPeriod {
+    function updateElegibleAdresses(address _buyerAddress) external onlyDAO activeVestingPeriod {
         for(uint256 i=0; i < index; i++){
             if(elegibleForClaims[i] == _buyerAddress) {
                 revert("Address already registered");
