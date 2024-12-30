@@ -19,6 +19,7 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__InsufficientBalance();
     error GovernanceDAO__InsufficientAmountOfTokenOnContract(uint256 _requestAmount, uint256 _tokenOnContractAmount);
     error GovernanceDAO__NotOwner();
+    error GovernanceDAO__ETHTransferToTreasuryFailed();
 
 //modifiers
     modifier onlyOwner() {
@@ -53,9 +54,11 @@ contract GovernanceDAO is ReentrancyGuard{
 //variables and mappings
     mapping (uint256 => ProposalStruct) public proposals;
     mapping (uint256 => ProposalVoteResult) public voteResults;
+
     address immutable i_teamAddress;
     address immutable i_tokenContractAddress;
     address immutable i_treasuryContractAddress; 
+
     uint256 public minimumTokenToMakeAProposal;
     uint256 internal proposalIndexCounter;
     bool public isTradingAllowed;
@@ -67,6 +70,8 @@ contract GovernanceDAO is ReentrancyGuard{
     event MooveTreasuryCreated(address treasuryAddress, address owner, address dao);
     event ProposalCreated(address indexed _proposer, uint256 indexed _proposalIndex);
     event TradingStatusChanged (bool tradingIsAllowed);
+    event SuccesfulTransferToTreasury(uint256 amount);
+    event FailedTransferToTreasury(uint256 amount);
 
 //constructor
     constructor( 
@@ -151,10 +156,12 @@ contract GovernanceDAO is ReentrancyGuard{
         uint256 amountToSend = ethAmountInUsd / tokenPriceWithDecimals;
 
         MooveToken.sendingToken(address(this), msg.sender, amountToSend);
-
         MooveToken.updateElegibleAdresses(msg.sender);
-
-        //inviare i fondi ricevuti al contratto della treasury
+        
+        bool sendSuccess = payable(i_treasuryContractAddress).send(msg.value);
+        if (!sendSuccess) {
+            emit FailedTransferToTreasury(msg.value);
+        } else emit SuccesfulTransferToTreasury(msg.value);
     }
 
     function getEthPrice() public view returns(uint256){

@@ -19,7 +19,6 @@ contract TreasuryDAO is ReentrancyGuard {
 //events
     event Deposit(address indexed from, uint256 amount);
     event Withdrawal(address indexed to, uint256 amount);
-    event TokenTransfer(address indexed token, address indexed to, uint256 amount);
 
 //constructor
     constructor(address _teamAddress, address _DAOAddress){
