@@ -22,6 +22,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     //special addresses
     address public immutable i_Owner;
     address public immutable i_DAO;
+    address public immutable i_Treasury;
 
     //token and vesting 
     uint256 private immutable i_cap;
@@ -39,6 +40,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
     event Claimed (address indexed claimant, uint256 amount);
+    event SuccesfulTransferToTreasury(uint256 amount);
 
 //Custom Errors
 
@@ -51,6 +53,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     error GovernanceToken__CapMustBeGreaterThanZero();
     error GovernanceToken__TokenPriceMustBeGreaterThanZero();
     error GovernanceToken__InsufficientBalance();
+    error GovernanceToken__ETHTransferToTreasuryFailed();
 
 
 //Modifiers
@@ -85,7 +88,8 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         string memory _name,                    // Token name
         string memory _symbol,                  // Token simbol
         address _teamAddress,                   // team's address
-        address _DAOAddress,                    // DAO' s address 
+        address _DAOAddress,                    // DAO' s address
+        address _treasuryAddress,               // DAO's treasury address        
         uint256 _teamMintSupply,                // Supply for the team
         uint256 _cap,                           // Max supply 
         uint256 _olderUsersMintSupply,          // Supply for the older users
@@ -101,6 +105,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
         i_Owner = _teamAddress;
         i_DAO = _DAOAddress;
+        i_Treasury = _treasuryAddress;
         i_cap = _cap;
         tokenPrice = _tokenPrice;
 
@@ -202,6 +207,25 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
     function sendingToken(address _daoAddress, address _addressFunder, uint256 _amount) public onlyDAO {
         _transfer(_daoAddress,_addressFunder,_amount);
+    }
+
+    receive() external payable{
+        bool sendSuccess = payable(i_Treasury).send(msg.value);
+        if(sendSuccess){
+            emit SuccesfulTransferToTreasury(msg.value);
+        } else {
+            revert GovernanceToken__ETHTransferToTreasuryFailed();  
+        }
+
+    }
+
+    fallback() external payable{
+        (bool sendSuccess, ) = payable(i_Treasury).call{value: msg.value}(msg.data);
+         if(sendSuccess){
+            emit SuccesfulTransferToTreasury(msg.value);
+        } else {
+            revert GovernanceToken__ETHTransferToTreasuryFailed();  
+        }
     }
 
 

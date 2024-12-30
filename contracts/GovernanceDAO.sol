@@ -55,6 +55,7 @@ contract GovernanceDAO is ReentrancyGuard{
     mapping (uint256 => ProposalVoteResult) public voteResults;
     address immutable i_teamAddress;
     address immutable i_tokenContractAddress;
+    address immutable i_treasuryContractAddress; 
     uint256 public minimumTokenToMakeAProposal;
     uint256 internal proposalIndexCounter;
     bool public isTradingAllowed;
@@ -63,6 +64,7 @@ contract GovernanceDAO is ReentrancyGuard{
 //event
     event ProposalCreated(address indexed _proposer, uint256 indexed _proposalIndex);
     event TradingStatusChanged (bool tradingIsAllowed);
+
 //constructor
     constructor( 
         string memory _name,                    // Token name
@@ -76,11 +78,14 @@ contract GovernanceDAO is ReentrancyGuard{
         uint256 _tokenPrice,                    // price of single token
         uint256 _minimumTokenToMakeAProposal                      
     ){
+        MooveTreasury = new TreasuryDAO(i_teamAddress, address(this));  
+
         MooveToken = new GovernanceToken(
             _name,
             _symbol,
             msg.sender,
             address(this),
+            address(MooveTreasury),
             _teamMintSupply,
             _cap, 
             _olderUsersMintSupply,
@@ -91,9 +96,9 @@ contract GovernanceDAO is ReentrancyGuard{
             );
 
         i_tokenContractAddress = address(MooveToken);
+        i_treasuryContractAddress = address(MooveTreasury);
         i_teamAddress = msg.sender;
 
-        MooveTreasury = new TreasuryDAO(i_teamAddress, address(this));
         minimumTokenToMakeAProposal = _minimumTokenToMakeAProposal;
     }
 
