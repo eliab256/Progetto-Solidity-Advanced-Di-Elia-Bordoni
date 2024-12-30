@@ -62,6 +62,9 @@ contract GovernanceDAO is ReentrancyGuard{
     uint256 public tokenPrice = MooveToken.getPrice();
 
 //event
+
+    event MooveTokenCreated(address tokenAddress, string name, string symbol, address owner, uint256 totalSupply, uint256 tokenPrice);
+    event MooveTreasuryCreated(address treasuryAddress, address owner, address dao);
     event ProposalCreated(address indexed _proposer, uint256 indexed _proposalIndex);
     event TradingStatusChanged (bool tradingIsAllowed);
 
@@ -98,8 +101,10 @@ contract GovernanceDAO is ReentrancyGuard{
         i_tokenContractAddress = address(MooveToken);
         i_treasuryContractAddress = address(MooveTreasury);
         i_teamAddress = msg.sender;
-
         minimumTokenToMakeAProposal = _minimumTokenToMakeAProposal;
+
+        emit MooveTokenCreated(i_tokenContractAddress, _name, _symbol, msg.sender, _cap, _tokenPrice);
+        emit MooveTreasuryCreated(i_treasuryContractAddress, msg.sender, address(this));
     }
 
 //functions
