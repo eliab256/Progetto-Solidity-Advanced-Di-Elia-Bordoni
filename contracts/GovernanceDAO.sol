@@ -3,14 +3,17 @@
 pragma solidity ^0.8.28;
 
 import {GovernanceToken} from "./GovernanceToken.sol";
+import {StakingTokenManager} from "./StakingTokenManager.sol";
+import {TreasuryDAO} from "./TreasuryDAO.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {TreasuryDAO} from "./TreasuryDAO.sol";
+
 
 contract GovernanceDAO is ReentrancyGuard{
 
     GovernanceToken public MooveToken;
     TreasuryDAO public MooveTreasury;
+    StakingTokenManager public MooveStakingManager;
 
 //errors
     error GovernanceDAO__NotEnoughtTokenToVote();
@@ -68,10 +71,12 @@ contract GovernanceDAO is ReentrancyGuard{
 //variables and mappings
     mapping (uint256 => ProposalStruct) public proposals;
     mapping (uint256 => ProposalVoteResult) public voteResults;
+    mapping (address => bool) public activeProposers;
 
     address immutable i_teamAddress;
     address immutable i_tokenContractAddress;
-    address immutable i_treasuryContractAddress; 
+    address immutable i_treasuryContractAddress;
+    address immutable i_stakingContractAddress; 
 
     uint256 public tokenPrice = MooveToken.getPrice() * 10 ** MooveToken.decimals();
     bool public isTradingAllowed;
@@ -106,9 +111,10 @@ contract GovernanceDAO is ReentrancyGuard{
         uint8 _weeksOfVesting,                  // Duration of vesting period in weeks    
         uint256 _tokenPrice,                    // price of single token
         uint256 _minimumTokenToMakeAProposal,
-        uint256 _minimumCirculatingSupplyToMakeAProposalInPercent                     
+        uint256 _minimumCirculatingSupplyToMakeAProposalInPercent,
+        uint256 _slashingPercent                     
     ){
-        MooveTreasury = new TreasuryDAO(i_teamAddress, address(this));  
+        MooveTreasury = new TreasuryDAO(msg.sender, address(this)); 
 
         MooveToken = new GovernanceToken(
             _name,
@@ -125,9 +131,12 @@ contract GovernanceDAO is ReentrancyGuard{
             _tokenPrice
             );
 
+        MooveStakingManager = new StakingTokenManager(msg.sender, address(this), address(MooveToken), _slashingPercent);
+
         i_tokenContractAddress = address(MooveToken);
         i_treasuryContractAddress = address(MooveTreasury);
         i_teamAddress = msg.sender;
+        i_stakingContractAddress = address(MooveStakingManager);
         minimumTokenToMakeAProposal = _minimumTokenToMakeAProposal * 10 ** MooveToken.decimals();
         minimumCirculatingSupplyToMakeAProposalInPercent = _minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
 
@@ -162,6 +171,7 @@ contract GovernanceDAO is ReentrancyGuard{
        
         uint256 currentProposalIndex = newProposal.proposalIndex;
         proposals[currentProposalIndex] = newProposal;
+        activeProposers[msg.sender] = true;
 
         voteResults[currentProposalIndex].forVotes = 0;
         voteResults[currentProposalIndex].againstVotes = 0;

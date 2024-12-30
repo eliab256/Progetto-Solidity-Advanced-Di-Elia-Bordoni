@@ -7,6 +7,45 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 contract GovernanceToken is ERC20, ReentrancyGuard {
 
+//Custom Errors
+    error GovernanceToken__NotOwner();
+    error GovernanceToken__NotDAO();
+    error GovernanceToken__NotEnoughTokens(uint256);
+    error GovernanceToken__MaxSupplyReached(uint256 _supply, uint256 __cap);
+    error GovernanceToken__VestingPeriodNotActive();
+    error GovernanceToken__VestingPeriodIsActive();
+    error GovernanceToken__CapMustBeGreaterThanZero();
+    error GovernanceToken__TokenPriceMustBeGreaterThanZero();
+    error GovernanceToken__InsufficientBalance();
+    error GovernanceToken__ETHTransferToTreasuryFailed();
+
+//Modifiers
+    modifier onlyOwner() {
+        if(msg.sender != i_Owner){ revert GovernanceToken__NotOwner();}
+        _;
+    }
+
+    modifier onlyDAO(){
+        if(msg.sender != i_DAO){revert GovernanceToken__NotDAO();}
+        _;
+    }
+    
+    modifier maxSupplyNotReached(uint256 _amount){
+        if(totalSupply() + (_amount * 10 ** decimals()) > (i_cap * 10 ** decimals())) {
+            revert GovernanceToken__MaxSupplyReached(totalSupply()/1e18, i_cap);}
+        _;
+    }
+
+    modifier activeVestingPeriod(){
+     if(vestingPeriod == false){revert GovernanceToken__VestingPeriodNotActive();}
+        _;
+    }
+
+    modifier inactiveVestingPeriod(){
+        if(vestingPeriod == true){revert GovernanceToken__VestingPeriodIsActive();}
+        _;
+    }
+
 //variables declaration
 
     //about time
@@ -41,47 +80,6 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
     event Claimed (address indexed claimant, uint256 amount);
     event SuccesfulTransferToTreasury(uint256 amount);
-
-//Custom Errors
-
-    error GovernanceToken__NotOwner();
-    error GovernanceToken__NotDAO();
-    error GovernanceToken__NotEnoughTokens(uint256);
-    error GovernanceToken__MaxSupplyReached(uint256 _supply, uint256 __cap);
-    error GovernanceToken__VestingPeriodNotActive();
-    error GovernanceToken__VestingPeriodIsActive();
-    error GovernanceToken__CapMustBeGreaterThanZero();
-    error GovernanceToken__TokenPriceMustBeGreaterThanZero();
-    error GovernanceToken__InsufficientBalance();
-    error GovernanceToken__ETHTransferToTreasuryFailed();
-
-
-//Modifiers
-    modifier onlyOwner() {
-        if(msg.sender != i_Owner){ revert GovernanceToken__NotOwner();}
-        _;
-    }
-
-    modifier onlyDAO(){
-        if(msg.sender != i_DAO){revert GovernanceToken__NotDAO();}
-        _;
-    }
-    
-    modifier maxSupplyNotReached(uint256 _amount){
-        if(totalSupply() + (_amount * 10 ** decimals()) > (i_cap * 10 ** decimals())) {
-            revert GovernanceToken__MaxSupplyReached(totalSupply()/1e18, i_cap);}
-        _;
-    }
-
-    modifier activeVestingPeriod(){
-     if(vestingPeriod == false){revert GovernanceToken__VestingPeriodNotActive();}
-        _;
-    }
-
-    modifier inactiveVestingPeriod(){
-        if(vestingPeriod == true){revert GovernanceToken__VestingPeriodIsActive();}
-        _;
-    }
 
 //Constructor
     constructor(
