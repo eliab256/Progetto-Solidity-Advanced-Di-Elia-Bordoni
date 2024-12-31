@@ -14,6 +14,8 @@ contract StakingTokenManager is ReentrancyGuard {
     error StakingTokenManager__TransferTounstakeFailed();
     error StakingTokenManager__NotOwner();
     error StakingTokenManager__NotDAO();
+    error StakingTokenManager__TokensLockedDueToActiveProposal();
+    error StakingTokenManager__TokensAlreadyLocked();
 
 //modifiers
     modifier onlyOwner() {
@@ -63,10 +65,12 @@ contract StakingTokenManager is ReentrancyGuard {
         uint256 amountStaked = stakingBalances[msg.sender];
         if (amountStaked == 0) {revert StakingTokenManager__NoTokensStaked();}
         if (_amount > amountStaked){revert StakingTokenManager__AmountHigherThanStakedTokens();}
+        if (lockedStakedTokens[msg.sender]){revert StakingTokenManager__TokensLockedDueToActiveProposal();}
 
         stakingBalances[msg.sender] = amountStaked - _amount;
         bool trasferSuccess = i_tokenAddress.transfer(msg.sender, _amount);
         if (!trasferSuccess) {revert StakingTokenManager__TransferTounstakeFailed();}
+
         emit TokensUnstaked(msg.sender, _amount, block.timestamp);
     }
 
@@ -75,7 +79,8 @@ contract StakingTokenManager is ReentrancyGuard {
     }
 
     function lockStakedTokens(address _addressProposer) external onlyDAO{
-        
+        if(lockedStakedTokens[_addressProposer]){revert StakingTokenManager__TokensAlreadyLocked(); }
+        lockedStakedTokens[_addressProposer] = true;
     }
 
     function tokenSlasher(address _slashingTarget) external {

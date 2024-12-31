@@ -173,6 +173,7 @@ contract GovernanceDAO is ReentrancyGuard{
         uint256 currentProposalIndex = newProposal.proposalIndex;
         proposals[currentProposalIndex] = newProposal;
         activeProposers[msg.sender] = true;
+        MooveStakingManager.lockStakedTokens(msg.sender);
 
         voteResults[currentProposalIndex].forVotes = 0;
         voteResults[currentProposalIndex].againstVotes = 0;
