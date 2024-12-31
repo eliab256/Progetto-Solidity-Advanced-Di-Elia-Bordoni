@@ -27,8 +27,8 @@ contract StakingTokenManager is ReentrancyGuard {
     }
 
 //events
-    event TokensStaked(address indexed user, uint256 amount);
-    event TokensUnstaked(address indexed user, uint256 amount);
+    event TokensStaked(address indexed user, uint256 amount, uint256 timestamp);
+    event TokensUnstaked(address indexed user, uint256 amount, uint256 timestamp);
 
 //variables and mapping
     IERC20 public immutable i_tokenAddress;
@@ -37,6 +37,7 @@ contract StakingTokenManager is ReentrancyGuard {
     uint256 immutable i_slashingPercent;
 
     mapping(address => uint256) stakingBalances;
+    mapping(address => bool) lockedStakedTokens;
 
     constructor(
         address _teamAddress, 
@@ -55,7 +56,7 @@ contract StakingTokenManager is ReentrancyGuard {
         if (!transferSuccess) {revert StakingTokenManager__TransferToStakingFailed();}
 
         stakingBalances[msg.sender] += _amount;
-        emit TokensStaked(msg.sender, _amount);
+        emit TokensStaked(msg.sender, _amount, block.timestamp);
     }
 
     function unstakeTokens(uint256 _amount) external {
@@ -66,15 +67,19 @@ contract StakingTokenManager is ReentrancyGuard {
         stakingBalances[msg.sender] = amountStaked - _amount;
         bool trasferSuccess = i_tokenAddress.transfer(msg.sender, _amount);
         if (!trasferSuccess) {revert StakingTokenManager__TransferTounstakeFailed();}
-        emit TokensUnstaked(msg.sender, _amount);
+        emit TokensUnstaked(msg.sender, _amount, block.timestamp);
+    }
+
+    function getUserStakedTokens(address _addressProposer) external view onlyDAO returns(uint256) {
+        return stakingBalances[_addressProposer];
+    }
+
+    function lockStakedTokens(address _addressProposer) external onlyDAO{
+        
     }
 
     function tokenSlasher(address _slashingTarget) external {
 
-    }
-
-    function getUserStakedTokens(address _user) public view returns (uint256) {
-        return stakingBalances[_user];
     }
 
 }

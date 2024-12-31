@@ -17,8 +17,9 @@ contract GovernanceDAO is ReentrancyGuard{
 
 //errors
     error GovernanceDAO__NotEnoughtTokenToVote();
-    error GovernanceDAO__NotEnoughtTokenToMakeProposal(uint256 _tokenYouHave, uint256 _tokenYouNeed);
+    error GovernanceDAO__NotEnoughtTokenStakedToMakeProposal(uint256 _stakedToken, uint256 _tokenStakedYouNeed);
     error GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals(uint256 _actualSupply, uint256 _minimumSupply);
+    error GovernanceDAO__AnotherProposalStillActive();
     error GovernanceDAO__TradingIsNotAllowed();
     error GovernanceDAO__InsufficientBalance();
     error GovernanceDAO__InsufficientAmountOfTokenOnContract(uint256 _requestAmount, uint256 _tokenOnContractAmount);
@@ -28,13 +29,6 @@ contract GovernanceDAO is ReentrancyGuard{
 //modifiers
     modifier onlyOwner() {
         if(msg.sender != i_teamAddress){ revert GovernanceDAO__NotOwner();}
-        _;
-    }
-
-    modifier onlyEligibleProposers(){
-        if(MooveToken.balanceOf(msg.sender) < minimumTokenToMakeAProposal){
-            revert GovernanceDAO__NotEnoughtTokenToMakeProposal(MooveToken.balanceOf(msg.sender), minimumTokenToMakeAProposal);
-        }
         _;
     }
 
@@ -81,7 +75,7 @@ contract GovernanceDAO is ReentrancyGuard{
     uint256 public tokenPrice = MooveToken.getPrice() * 10 ** MooveToken.decimals();
     bool public isTradingAllowed;
 
-    uint256 public minimumTokenToMakeAProposal;
+    uint256 public minimumTokenStakedToMakeAProposal;
     uint256 public minimumCirculatingSupplyToMakeAProposalInPercent;
     uint256 internal proposalIndexCounter;  
 
@@ -110,7 +104,7 @@ contract GovernanceDAO is ReentrancyGuard{
         address[] memory _olderUsersAddresses,  // Array of older users
         uint8 _weeksOfVesting,                  // Duration of vesting period in weeks    
         uint256 _tokenPrice,                    // price of single token
-        uint256 _minimumTokenToMakeAProposal,
+        uint256 _minimumTokenStakedToMakeAProposal,
         uint256 _minimumCirculatingSupplyToMakeAProposalInPercent,
         uint256 _slashingPercent                     
     ){
@@ -137,7 +131,7 @@ contract GovernanceDAO is ReentrancyGuard{
         i_treasuryContractAddress = address(MooveTreasury);
         i_teamAddress = msg.sender;
         i_stakingContractAddress = address(MooveStakingManager);
-        minimumTokenToMakeAProposal = _minimumTokenToMakeAProposal * 10 ** MooveToken.decimals();
+        minimumTokenStakedToMakeAProposal = _minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals();
         minimumCirculatingSupplyToMakeAProposalInPercent = _minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
 
         emit MooveTokenCreated(i_tokenContractAddress, _name, _symbol, msg.sender, _cap, _tokenPrice);
@@ -147,15 +141,22 @@ contract GovernanceDAO is ReentrancyGuard{
 
 //functions
 
-    function getMinimumTokenToMakeAProposal() public view returns(uint256) {
-        return minimumTokenToMakeAProposal;
+    function getMinimumTokenStakedToMakeAProposal() public view returns(uint256) {
+        return minimumTokenStakedToMakeAProposal;
     }
 
-    function makeProposal(string calldata _proposalDescription) external onlyEligibleProposers {
+    function makeProposal(string calldata _proposalDescription) external {
         uint256 minimumCirculatingSupply = MooveToken.totalSupply() * minimumCirculatingSupplyToMakeAProposalInPercent / 100;
         uint256 actualCirculatingSupply = MooveToken.totalSupply() - MooveToken.balanceOf(address(this));
         if(actualCirculatingSupply < minimumCirculatingSupply){
             revert GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals(actualCirculatingSupply,minimumCirculatingSupply);
+        }
+
+        if(activeProposers[msg.sender]){revert GovernanceDAO__AnotherProposalStillActive();}
+
+        uint256 stakedToken = MooveStakingManager.getUserStakedTokens(msg.sender);
+        if(stakedToken < minimumTokenStakedToMakeAProposal){
+            revert GovernanceDAO__NotEnoughtTokenStakedToMakeProposal(stakedToken, minimumTokenStakedToMakeAProposal);
         }
 
         ProposalStruct memory newProposal = ProposalStruct ({
