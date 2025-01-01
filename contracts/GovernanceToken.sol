@@ -19,6 +19,11 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     error GovernanceToken__InsufficientBalance();
     error GovernanceToken__ETHTransferToTreasuryFailed();
 
+//events
+    event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
+    event Claimed (address indexed claimant, uint256 amount);
+    event SuccesfulTransferToTreasury(uint256 amount);
+
 //Modifiers
     modifier onlyOwner() {
         if(msg.sender != i_Owner){ revert GovernanceToken__NotOwner();}
@@ -74,12 +79,6 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     mapping (uint256 => address) elegibleForClaims; 
     mapping (address => uint256) claimsAmountForAddress;
     uint256 private index;   
-
-//events
-    
-    event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
-    event Claimed (address indexed claimant, uint256 amount);
-    event SuccesfulTransferToTreasury(uint256 amount);
 
 //Constructor
     constructor(

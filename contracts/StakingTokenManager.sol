@@ -7,7 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 contract StakingTokenManager is ReentrancyGuard {
 
-//errors 
+//custom errors 
     error StakingTokenManager__TransferToStakingFailed();
     error StakingTokenManager__NoTokensStaked();
     error StakingTokenManager__AmountHigherThanStakedTokens();
@@ -16,6 +16,11 @@ contract StakingTokenManager is ReentrancyGuard {
     error StakingTokenManager__NotDAO();
     error StakingTokenManager__TokensLockedDueToActiveProposal();
     error StakingTokenManager__TokensAlreadyLocked();
+    error StakingTokenManager__NoTokensToUnlock();
+
+//events
+    event TokensStaked(address indexed user, uint256 amount, uint256 timestamp);
+    event TokensUnstaked(address indexed user, uint256 amount, uint256 timestamp);
 
 //modifiers
     modifier onlyOwner() {
@@ -27,10 +32,6 @@ contract StakingTokenManager is ReentrancyGuard {
         if(msg.sender != i_DaoContractAddress){revert StakingTokenManager__NotDAO();}
         _;
     }
-
-//events
-    event TokensStaked(address indexed user, uint256 amount, uint256 timestamp);
-    event TokensUnstaked(address indexed user, uint256 amount, uint256 timestamp);
 
 //variables and mapping
     IERC20 public immutable i_tokenAddress;
@@ -74,17 +75,24 @@ contract StakingTokenManager is ReentrancyGuard {
         emit TokensUnstaked(msg.sender, _amount, block.timestamp);
     }
 
-    function getUserStakedTokens(address _addressProposer) external view onlyDAO returns(uint256) {
-        return stakingBalances[_addressProposer];
+    function lockStakedTokens(address _address) external onlyDAO{
+        if(lockedStakedTokens[_address]){revert StakingTokenManager__TokensAlreadyLocked(); }
+        lockedStakedTokens[_address] = true;
     }
 
-    function lockStakedTokens(address _addressProposer) external onlyDAO{
-        if(lockedStakedTokens[_addressProposer]){revert StakingTokenManager__TokensAlreadyLocked(); }
-        lockedStakedTokens[_addressProposer] = true;
+    function unlockStakedTokens(address _address) external onlyDAO{
+        if(!lockedStakedTokens[_address]){revert StakingTokenManager__NoTokensToUnlock(); }
+        lockedStakedTokens[_address] = false;
     }
 
     function tokenSlasher(address _slashingTarget) external {
 
     }
+
+    function getUserStakedTokens(address _address) external view onlyDAO returns(uint256) {
+        return stakingBalances[_address];
+    }
+
+    function getDelegateeList() public {}
 
 }

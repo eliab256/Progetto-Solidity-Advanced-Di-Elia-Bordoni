@@ -15,7 +15,7 @@ contract GovernanceDAO is ReentrancyGuard{
     TreasuryDAO public MooveTreasury;
     StakingTokenManager public MooveStakingManager;
 
-//errors
+//custom errors
     error GovernanceDAO__NotEnoughtTokenToVote();
     error GovernanceDAO__NotEnoughtTokenStakedToMakeProposal(uint256 _stakedToken, uint256 _tokenStakedYouNeed);
     error GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals(uint256 _actualSupply, uint256 _minimumSupply);
@@ -25,6 +25,29 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__InsufficientAmountOfTokenOnContract(uint256 _requestAmount, uint256 _tokenOnContractAmount);
     error GovernanceDAO__NotOwner();
     error GovernanceDAO__ETHTransferToTreasuryFailed();
+    error GovernanceDao__DescriptionCannotBeEmpty();
+    error GovernanceDAO__InvalidId();
+    error GovernanceDAO__InvalidDelegateeAddress();
+    error GovernanceDAO__NoDelegationFound();
+    error GovernanceDAO__DelegatorHasNotToken();
+    error GovernanceDAO__CantBeProposerAndDelegateeTogether();
+    error GovernanceDAO__DelegateeCantBeDelegator();
+    error GovernanceDAO__AlreadyDelegatee();
+    error GovernanceDAO__AlreadyDelegator();
+
+//event
+    event MooveTokenCreated(address tokenAddress, string name, string symbol, address owner, uint256 totalSupply, uint256 tokenPrice);
+    event MooveTreasuryCreated(address treasuryAddress, address owner, address dao);  
+    event TradingStatusChanged (bool tradingIsAllowed);
+    event TokenPurchased(address indexed _buyer, uint256 indexed _amount);
+    event NewTokenPriceSet(uint256 indexed _newPrice);
+    event SuccesfulTransferToTreasury(uint256 amount);
+    event FailedTransferToTreasury(uint256 amount);
+    event ProposalCreated(address indexed proposer, uint256 indexed proposalIndex, string proposalDescription, uint256 creationTime, uint256 closeVotationTime);
+    //event ProposalApproved(uint256 indexed _proposalIndex, uint256 indexed _voteFor, uint256 indexed _voteAgainst);
+    //event ProposalFailed(uint256 indexed _proposalIndex, uint256 indexed _voteFor, uint256 indexed _voteAgainst);
+    //event VoteRegistered(address indexed _voter, bool indexed _voteFor, uint256 indexed _proposalIndex);
+    event VoteDelegated(address indexed delegant, address indexed delegatee, uint256 tokenAmountDelegated);
 
 //modifiers
     modifier onlyOwner() {
@@ -32,40 +55,43 @@ contract GovernanceDAO is ReentrancyGuard{
         _;
     }
 
+    modifier onlyEligibleToProposeOrDelegatee(){
+        uint256 stakedToken = MooveStakingManager.getUserStakedTokens(msg.sender);
+        if(stakedToken < minimumTokenStakedToMakeAProposal){
+            revert GovernanceDAO__NotEnoughtTokenStakedToMakeProposal(stakedToken, minimumTokenStakedToMakeAProposal);
+        }
+        _;
+    }
+
     modifier onlyEligibleVoters(){
-        if(MooveToken.balanceOf(msg.sender) == 0){revert GovernanceDAO__NotEnoughtTokenToVote();}
+        if(MooveStakingManager.getUserStakedTokens(msg.sender) <= 0){revert GovernanceDAO__NotEnoughtTokenToVote();}
         _;
     }
     
 //structs and Enum  
-    enum ProposalVoteOptions{
+    enum VoteOptions{
         InFavor,
         Against,
         Abstain
     }
 
-    struct ProposalVoteResult{
-        mapping(address => uint8) voterChoices; //  0: For, 1: Against, 2: Abstain
+    struct Proposal {
+        uint256 proposalId;
+        address proposer;
+        string description;
+        uint256 creationTimeStamp;
+        uint256 endVotingTimestamp;
         uint forVotes;
         uint againstVotes;
         uint abstainVotes;
-    }
-
-    struct ProposalStruct {
-        uint256 proposalIndex;
-        address proposer;
-        string proposalDescription;
-        uint256 creationTimeStamp;
-        uint256 startVotingTimestamp;
-        uint256 endVotingTimestamp;
         bool isFinalized;
         bool isApproved;
     }
 
 //variables and mappings
-    mapping (uint256 => ProposalStruct) public proposals;
-    mapping (uint256 => ProposalVoteResult) public voteResults;
+    mapping (uint256 => Proposal) public proposalsById;
     mapping (address => bool) public activeProposers;
+    mapping (address => address[]) public delegateeToDelegators;
 
     address immutable i_teamAddress;
     address immutable i_tokenContractAddress;
@@ -75,23 +101,11 @@ contract GovernanceDAO is ReentrancyGuard{
     uint256 public tokenPrice = MooveToken.getPrice() * 10 ** MooveToken.decimals();
     bool public isTradingAllowed;
 
+    uint256 public daysofVoting;
     uint256 public minimumTokenStakedToMakeAProposal;
     uint256 public minimumCirculatingSupplyToMakeAProposalInPercent;
-    uint256 internal proposalIndexCounter;  
-
-//event
-
-    event MooveTokenCreated(address tokenAddress, string name, string symbol, address owner, uint256 totalSupply, uint256 tokenPrice);
-    event MooveTreasuryCreated(address treasuryAddress, address owner, address dao);  
-    event TradingStatusChanged (bool tradingIsAllowed);
-    event TokenPurchased(address indexed _buyer, uint256 indexed _amount);
-    event NewTokenPriceSet(uint256 indexed _newPrice);
-    event SuccesfulTransferToTreasury(uint256 amount);
-    event FailedTransferToTreasury(uint256 amount);
-    event ProposalCreated(address indexed _proposer, uint256 indexed _proposalIndex);
-    //event VoteRegistered(address indexed _voter, bool indexed _voteFor, uint256 indexed _proposalIndex);
-    //event ProposalApproved(uint256 indexed _proposalIndex, uint256 indexed _voteFor, uint256 indexed _voteAgainst);
-    //event ProposalFailed(uint256 indexed _proposalIndex, uint256 indexed _voteFor, uint256 indexed _voteAgainst);
+    uint256 internal proposalIdCounter; 
+    uint256 public proposalQuorum; 
 
 //constructor
     constructor( 
@@ -106,7 +120,9 @@ contract GovernanceDAO is ReentrancyGuard{
         uint256 _tokenPrice,                    // price of single token
         uint256 _minimumTokenStakedToMakeAProposal,
         uint256 _minimumCirculatingSupplyToMakeAProposalInPercent,
-        uint256 _slashingPercent                     
+        uint256 _proposalQuorum,
+        uint256 _slashingPercent,
+        uint256 _votingPeriodInDays                     
     ){
         MooveTreasury = new TreasuryDAO(msg.sender, address(this)); 
 
@@ -133,6 +149,8 @@ contract GovernanceDAO is ReentrancyGuard{
         i_stakingContractAddress = address(MooveStakingManager);
         minimumTokenStakedToMakeAProposal = _minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals();
         minimumCirculatingSupplyToMakeAProposalInPercent = _minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
+        proposalQuorum = _proposalQuorum;
+        daysofVoting = _votingPeriodInDays * 86400;
 
         emit MooveTokenCreated(i_tokenContractAddress, _name, _symbol, msg.sender, _cap, _tokenPrice);
         emit MooveTreasuryCreated(i_treasuryContractAddress, msg.sender, address(this));
@@ -145,7 +163,9 @@ contract GovernanceDAO is ReentrancyGuard{
         return minimumTokenStakedToMakeAProposal;
     }
 
-    function makeProposal(string calldata _proposalDescription) external {
+    function makeProposal(string calldata _proposalDescription) external onlyEligibleToProposeOrDelegatee {
+        if (bytes(_proposalDescription).length <= 0) {revert GovernanceDao__DescriptionCannotBeEmpty();}
+
         uint256 minimumCirculatingSupply = MooveToken.totalSupply() * minimumCirculatingSupplyToMakeAProposalInPercent / 100;
         uint256 actualCirculatingSupply = MooveToken.totalSupply() - MooveToken.balanceOf(address(this));
         if(actualCirculatingSupply < minimumCirculatingSupply){
@@ -154,35 +174,68 @@ contract GovernanceDAO is ReentrancyGuard{
 
         if(activeProposers[msg.sender]){revert GovernanceDAO__AnotherProposalStillActive();}
 
-        uint256 stakedToken = MooveStakingManager.getUserStakedTokens(msg.sender);
-        if(stakedToken < minimumTokenStakedToMakeAProposal){
-            revert GovernanceDAO__NotEnoughtTokenStakedToMakeProposal(stakedToken, minimumTokenStakedToMakeAProposal);
-        }
-
-        ProposalStruct memory newProposal = ProposalStruct ({
-            proposalIndex: proposalIndexCounter,
+        Proposal memory proposal = Proposal ({
+            proposalId: proposalIdCounter,
             proposer: msg.sender,
-            proposalDescription: _proposalDescription,
+            description: _proposalDescription,
             creationTimeStamp: block.timestamp,
-            startVotingTimestamp: 0,
-            endVotingTimestamp: 0,
+            endVotingTimestamp: block.timestamp + daysofVoting,
+            forVotes : 0,
+            againstVotes : 0,
+            abstainVotes : 0,
             isFinalized: false,
             isApproved: false
+            //no mapping address => vote, it will be set offchain with events
         });
        
-        uint256 currentProposalIndex = newProposal.proposalIndex;
-        proposals[currentProposalIndex] = newProposal;
+        uint256 currentProposalId = proposal.proposalId;
+        proposalsById[currentProposalId] = proposal;
         activeProposers[msg.sender] = true;
         MooveStakingManager.lockStakedTokens(msg.sender);
 
-        voteResults[currentProposalIndex].forVotes = 0;
-        voteResults[currentProposalIndex].againstVotes = 0;
-        voteResults[currentProposalIndex].abstainVotes = 0;
+        proposalIdCounter++;    
 
-        proposalIndexCounter++;    
+        emit ProposalCreated(proposal.proposer, proposal.proposalId, proposal.description, proposal.creationTimeStamp, proposal.endVotingTimestamp);
+    }
 
-        emit ProposalCreated(newProposal.proposer, newProposal.proposalIndex);
-    } 
+    function applyForDelegate() public onlyEligibleToProposeOrDelegatee() {
+        if(activeProposers[msg.sender]){revert GovernanceDAO__CantBeProposerAndDelegateeTogether();}
+        if(checkIfDelegator(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
+        if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__AlreadyDelegatee();}
+
+    }
+
+    function delegateVote(address _delegatee) public onlyEligibleVoters{
+        if(MooveStakingManager.getUserStakedTokens(_delegatee) <= 0){revert GovernanceDAO__InvalidDelegateeAddress();}
+        if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
+        if(checkIfDelegator(msg.sender)){revert GovernanceDAO__AlreadyDelegator();}
+
+        delegateeToDelegators[_delegatee].push(msg.sender);
+        MooveStakingManager.lockStakedTokens(msg.sender);
+        uint256 tokensDelegated = MooveStakingManager.getUserStakedTokens(msg.sender);
+
+        emit VoteDelegated(msg.sender, _delegatee, tokensDelegated);
+    }
+
+    function undelegateVote() public onlyEligibleVoters {
+        address[] storage delegators = delegateeToDelegators[msg.sender];
+        if(delegators.length == 0){revert GovernanceDAO__NoDelegationFound();}
+
+        for (uint i = 0; i < delegators.length; i++) {
+            if (delegators[i] == msg.sender) {
+                delegators[i] = delegators[delegators.length - 1];
+                delegators.pop();
+                break;
+            }
+        }
+
+        MooveStakingManager.unlockStakedTokens(msg.sender);
+        //aggiornare i mapping?
+    }
+
+    function voteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters {
+
+    }
 
     //functions to handle token trading
     function buyToken() public payable {
@@ -207,13 +260,13 @@ contract GovernanceDAO is ReentrancyGuard{
         } else emit SuccesfulTransferToTreasury(msg.value);
     }
 
-    function getEthPrice() public view returns(uint256){
+    function getEthPrice() private view returns(uint256){
         AggregatorV3Interface dataFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306);
         (,int256 answer,,,) = dataFeed.latestRoundData();
         return uint256(answer * 1e10);
     }
 
-    function getConversionRate(uint256 _ethAmount) public view returns(uint256){
+    function getConversionRate(uint256 _ethAmount) private view returns(uint256){
         uint256 ethPrice = getEthPrice();
         uint256 ethAmountInUsd = (ethPrice * _ethAmount) / 1e18;
         return ethAmountInUsd;
@@ -223,5 +276,30 @@ contract GovernanceDAO is ReentrancyGuard{
         isTradingAllowed = !isTradingAllowed; 
         emit TradingStatusChanged(isTradingAllowed);
     }
+
+    //view functions
+    function getVotePeriodActive(uint256 _id) view external returns(bool){   
+        Proposal memory proposal = proposalsById[_id];
+        if(proposal.endVotingTimestamp == 0){revert GovernanceDAO__InvalidId();}
+        return proposal.endVotingTimestamp > block.timestamp;
+    }
+
+    function checkIfDelegator(address _address) public view returns (bool) {
+        address[] storage delegators = delegateeToDelegators[_address];
+        
+        for (uint i = 0; i < delegators.length; i++) {
+            if (delegators[i] == msg.sender) {
+                return false; 
+            }
+        }
+        return true;
+    }
+
+    function checkIfDelegatee(address _address) public view returns (bool) {
+        address[] storage delegators = delegateeToDelegators[_address];
+        if(delegators.length > 0) return true;
+        else return false;
+    }
+
 
 }
