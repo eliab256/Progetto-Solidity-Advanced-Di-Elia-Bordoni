@@ -34,7 +34,8 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__DelegateeCantBeDelegator();
     error GovernanceDAO__AlreadyDelegatee();
     error GovernanceDAO__AlreadyDelegator();
-
+    error GovernanceDAO__NotAppliedDelegatee();
+    error GovernanceDAO__OutOfVotingPeriod();
 //event
     event MooveTokenCreated(address tokenAddress, string name, string symbol, address owner, uint256 totalSupply, uint256 tokenPrice);
     event MooveTreasuryCreated(address treasuryAddress, address owner, address dao);  
@@ -48,6 +49,7 @@ contract GovernanceDAO is ReentrancyGuard{
     //event ProposalFailed(uint256 indexed _proposalIndex, uint256 indexed _voteFor, uint256 indexed _voteAgainst);
     //event VoteRegistered(address indexed _voter, bool indexed _voteFor, uint256 indexed _proposalIndex);
     event VoteDelegated(address indexed delegant, address indexed delegatee, uint256 tokenAmountDelegated);
+    event VoteUndelegated(address indexed delegant, uint256 tokenAmountUndelegated);
 
 //modifiers
     modifier onlyOwner() {
@@ -90,8 +92,10 @@ contract GovernanceDAO is ReentrancyGuard{
 
 //variables and mappings
     mapping (uint256 => Proposal) public proposalsById;
+    mapping (address => mapping(uint256 => VoteOptions)) public voteList;
     mapping (address => bool) public activeProposers;
     mapping (address => address[]) public delegateeToDelegators;
+    address[] public delegatees; 
 
     address immutable i_teamAddress;
     address immutable i_tokenContractAddress;
@@ -203,13 +207,19 @@ contract GovernanceDAO is ReentrancyGuard{
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__AlreadyDelegatee();}
 
+        for (uint i = 0; i < delegatees.length; i++) {
+        if (delegatees[i] == msg.sender) {
+            return;
+            }
+        }
+        delegatees.push(msg.sender);
     }
 
     function delegateVote(address _delegatee) public onlyEligibleVoters{
-        if(MooveStakingManager.getUserStakedTokens(_delegatee) <= 0){revert GovernanceDAO__InvalidDelegateeAddress();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__AlreadyDelegator();}
-
+        if(!checkIfDelegatee(_delegatee)){revert GovernanceDAO__NotAppliedDelegatee();}
+        
         delegateeToDelegators[_delegatee].push(msg.sender);
         MooveStakingManager.lockStakedTokens(msg.sender);
         uint256 tokensDelegated = MooveStakingManager.getUserStakedTokens(msg.sender);
@@ -220,7 +230,8 @@ contract GovernanceDAO is ReentrancyGuard{
     function undelegateVote() public onlyEligibleVoters {
         address[] storage delegators = delegateeToDelegators[msg.sender];
         if(delegators.length == 0){revert GovernanceDAO__NoDelegationFound();}
-
+        //aggiungere condizioni per votazioni in corso
+        
         for (uint i = 0; i < delegators.length; i++) {
             if (delegators[i] == msg.sender) {
                 delegators[i] = delegators[delegators.length - 1];
@@ -228,14 +239,50 @@ contract GovernanceDAO is ReentrancyGuard{
                 break;
             }
         }
-
+        
         MooveStakingManager.unlockStakedTokens(msg.sender);
-        //aggiornare i mapping?
+        uint256 tokensDelegated = MooveStakingManager.getUserStakedTokens(msg.sender);
+        emit VoteUndelegated(msg.sender, tokensDelegated);
     }
 
     function voteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters {
+        Proposal memory proposal = proposalsById[_proposalId];
+        if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
+        //controllare se l' indirizzo ha già votato
+
 
     }
+
+
+    //view functions
+    function getVotePeriodActive(uint256 _id) view external returns(bool){   
+        Proposal memory proposal = proposalsById[_id];
+        if(proposal.endVotingTimestamp == 0){revert GovernanceDAO__InvalidId();}
+        return proposal.endVotingTimestamp > block.timestamp;
+    }
+
+    function checkIfDelegator(address _address) public view returns (bool) {
+        address[] storage delegators = delegateeToDelegators[_address];
+        
+        for (uint i = 0; i < delegators.length; i++) {
+            if (delegators[i] == _address) {
+                return false; 
+            }
+        }
+        return true;
+    }
+
+    function checkIfDelegatee(address _address) public view returns (bool) {
+       
+        for (uint i = 0; i < delegatees.length; i++) {
+            if (delegatees[i] == _address) {
+                return false; 
+            }
+        }
+        return true;
+    }
+
+
 
     //functions to handle token trading
     function buyToken() public payable {
@@ -277,29 +324,6 @@ contract GovernanceDAO is ReentrancyGuard{
         emit TradingStatusChanged(isTradingAllowed);
     }
 
-    //view functions
-    function getVotePeriodActive(uint256 _id) view external returns(bool){   
-        Proposal memory proposal = proposalsById[_id];
-        if(proposal.endVotingTimestamp == 0){revert GovernanceDAO__InvalidId();}
-        return proposal.endVotingTimestamp > block.timestamp;
-    }
-
-    function checkIfDelegator(address _address) public view returns (bool) {
-        address[] storage delegators = delegateeToDelegators[_address];
-        
-        for (uint i = 0; i < delegators.length; i++) {
-            if (delegators[i] == msg.sender) {
-                return false; 
-            }
-        }
-        return true;
-    }
-
-    function checkIfDelegatee(address _address) public view returns (bool) {
-        address[] storage delegators = delegateeToDelegators[_address];
-        if(delegators.length > 0) return true;
-        else return false;
-    }
 
 
 }
