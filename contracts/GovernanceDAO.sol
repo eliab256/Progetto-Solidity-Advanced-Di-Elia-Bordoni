@@ -36,6 +36,11 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__AlreadyDelegator();
     error GovernanceDAO__NotAppliedDelegatee();
     error GovernanceDAO__OutOfVotingPeriod();
+    error GovernanceDAO__VoteAlreadyRegistered();
+    error GovernanceDAO__YourVoteIsDelegated();
+    error GovernanceDAO__InvalideVoteOption();
+    error GovernanceDAO__DelegateeHasTheirOwnFunctionToVote();
+    
 //event
     event MooveTokenCreated(address tokenAddress, string name, string symbol, address owner, uint256 totalSupply, uint256 tokenPrice);
     event MooveTreasuryCreated(address treasuryAddress, address owner, address dao);  
@@ -88,11 +93,12 @@ contract GovernanceDAO is ReentrancyGuard{
         uint abstainVotes;
         bool isFinalized;
         bool isApproved;
+        
     }
 
 //variables and mappings
     mapping (uint256 => Proposal) public proposalsById;
-    mapping (address => mapping(uint256 => VoteOptions)) public voteList;
+    mapping(uint256 => mapping(address => bool)) public voteListById;
     mapping (address => bool) public activeProposers;
     mapping (address => address[]) public delegateeToDelegators;
     address[] public delegatees; 
@@ -189,7 +195,6 @@ contract GovernanceDAO is ReentrancyGuard{
             abstainVotes : 0,
             isFinalized: false,
             isApproved: false
-            //no mapping address => vote, it will be set offchain with events
         });
        
         uint256 currentProposalId = proposal.proposalId;
@@ -248,8 +253,18 @@ contract GovernanceDAO is ReentrancyGuard{
     function voteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters {
         Proposal memory proposal = proposalsById[_proposalId];
         if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
-        //controllare se l' indirizzo ha già votato
+        if(voteListById[_proposalId][msg.sender]){revert GovernanceDAO__VoteAlreadyRegistered();}
+        if(checkIfDelegator(msg.sender)){revert GovernanceDAO__YourVoteIsDelegated();}
+        if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeHasTheirOwnFunctionToVote();}
+        if(_vote > (type(VoteOptions).max) ){revert GovernanceDAO__InvalideVoteOption();}
 
+        if(_vote == VoteOptions.InFavor){
+
+        } else if(_vote == VoteOptions.Against){
+
+        } else if(_vote == VoteOptions.Abstain){
+
+        }
 
     }
 
