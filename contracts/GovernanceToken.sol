@@ -51,6 +51,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         _;
     }
 
+
 //variables declaration
 
     //about time
@@ -99,6 +100,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         if(totalInitalMint > _cap){revert GovernanceToken__MaxSupplyReached(totalInitalMint, _cap);}
         if(_cap == 0){revert GovernanceToken__CapMustBeGreaterThanZero();}
         if(_tokenPrice == 0){revert GovernanceToken__TokenPriceMustBeGreaterThanZero();}
+        //se questi controlli sono già presenti nel contratto di governance posso cancellare questi?
 
         i_Owner = _teamAddress;
         i_DAO = _DAOAddress;

@@ -16,6 +16,15 @@ contract GovernanceDAO is ReentrancyGuard{
     StakingTokenManager public MooveStakingManager;
 
 //custom errors
+    //constructor errors
+    error GovernanceDAO__NameAndSymbolFieldsCantBeEmpty();
+    error GovernanceDAO__MaxSupplyReached(uint256 _supply, uint256 __cap);
+    error GovernanceDAO__CapMustBeGreaterThanZero();
+    error GovernanceDAO__TokenPriceMustBeGreaterThanZero();
+    error GovernanceDAO__OlderUsersListMustBeMoreThanZero();
+    error GovernanceDAO__InvalidInputValue();
+    error GovernanceDAO__CirculatingSupplyCannotExceedCap();
+
     error GovernanceDAO__NotEnoughtTokenToVote();
     error GovernanceDAO__NotEnoughtTokenStakedToMakeProposal(uint256 _stakedToken, uint256 _tokenStakedYouNeed);
     error GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals(uint256 _actualSupply, uint256 _minimumSupply);
@@ -51,10 +60,11 @@ contract GovernanceDAO is ReentrancyGuard{
     event FailedTransferToTreasury(uint256 amount);
     event ProposalCreated(address indexed proposer, uint256 indexed proposalIndex, string proposalDescription, uint256 creationTime, uint256 closeVotationTime);
     //event ProposalApproved(uint256 indexed _proposalIndex, uint256 indexed _voteFor, uint256 indexed _voteAgainst);
-    //event ProposalFailed(uint256 indexed _proposalIndex, uint256 indexed _voteFor, uint256 indexed _voteAgainst);
-    //event VoteRegistered(address indexed _voter, bool indexed _voteFor, uint256 indexed _proposalIndex);
+    //event ProposalFailed(uint256 indexed _proposalIndex, uint256 indexed _voteFor, uint256 indexed _voteAgainst);  
     event VoteDelegated(address indexed delegant, address indexed delegatee, uint256 tokenAmountDelegated);
     event VoteUndelegated(address indexed delegant, uint256 tokenAmountUndelegated);
+    event SingleVoteRegistered(address indexed voter, VoteOptions indexed vote, uint256 votingPower, uint256 indexed proposalId);
+    event DelegateeVoteRegistered(address indexed voter, VoteOptions indexed vote, uint256 votingPower, uint256 indexed proposalId, address[] delegators);
 
 //modifiers
     modifier onlyOwner() {
@@ -119,21 +129,35 @@ contract GovernanceDAO is ReentrancyGuard{
 
 //constructor
     constructor( 
-        string memory _name,                    // Token name
-        string memory _symbol,                  // Token simbol
-        uint256 _teamMintSupply,                // Supply for the team
-        uint256 _cap,                           // Max supply 
-        uint256 _olderUsersMintSupply,          // Supply for the older users
-        uint256 _earlyAdopterMintSupply,        // Supply the users who interact with the protocol
-        address[] memory _olderUsersAddresses,  // Array of older users
-        uint8 _weeksOfVesting,                  // Duration of vesting period in weeks    
-        uint256 _tokenPrice,                    // price of single token
+        string memory _name,                            // Token name
+        string memory _symbol,                          // Token simbol
+        uint256 _teamMintSupply,                        // Supply for the team
+        uint256 _cap,                                   // Max supply 
+        uint256 _olderUsersMintSupply,                  // Supply for the older users
+        uint256 _earlyAdopterMintSupply,                // Supply the users who interact with the protocol
+        address[] memory _olderUsersAddresses,          // Array of older users
+        uint8 _weeksOfVesting,                          // Duration of vesting period in weeks    
+        uint256 _tokenPrice,                            // price of single token
         uint256 _minimumTokenStakedToMakeAProposal,
         uint256 _minimumCirculatingSupplyToMakeAProposalInPercent,
-        uint256 _proposalQuorum,
+        uint256 _proposalQuorumPercent,
         uint256 _slashingPercent,
         uint256 _votingPeriodInDays                     
     ){
+        if(bytes(_name).length == 0 || bytes(_symbol).length == 0 ){revert GovernanceDAO__NameAndSymbolFieldsCantBeEmpty();}
+        uint256 totalInitalMint = _teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply;
+        if(totalInitalMint > _cap){revert GovernanceDAO__MaxSupplyReached(totalInitalMint, _cap);}
+        if(_cap == 0){revert GovernanceDAO__CapMustBeGreaterThanZero();}
+        if(_tokenPrice == 0){revert GovernanceDAO__TokenPriceMustBeGreaterThanZero();}
+        if(_olderUsersMintSupply > 0 && _olderUsersAddresses.length == 0){revert GovernanceDAO__OlderUsersListMustBeMoreThanZero();}
+        if(_minimumTokenStakedToMakeAProposal == 0 || _minimumTokenStakedToMakeAProposal > totalInitalMint){
+            revert GovernanceDAO__InvalidInputValue();
+        }
+        if(_minimumCirculatingSupplyToMakeAProposalInPercent > _cap){revert GovernanceDAO__CirculatingSupplyCannotExceedCap();}
+        if(_proposalQuorumPercent < 0 || _proposalQuorumPercent > 100){revert GovernanceDAO__InvalidInputValue();}
+        if(_slashingPercent < 0 || _slashingPercent > 100){revert GovernanceDAO__InvalidInputValue();}
+        if(_votingPeriodInDays == 0) {revert GovernanceDAO__InvalidInputValue();}
+
         MooveTreasury = new TreasuryDAO(msg.sender, address(this)); 
 
         MooveToken = new GovernanceToken(
@@ -159,7 +183,7 @@ contract GovernanceDAO is ReentrancyGuard{
         i_stakingContractAddress = address(MooveStakingManager);
         minimumTokenStakedToMakeAProposal = _minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals();
         minimumCirculatingSupplyToMakeAProposalInPercent = _minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
-        proposalQuorum = _proposalQuorum;
+        proposalQuorum = (_cap * _proposalQuorumPercent) / 100;
         daysofVoting = _votingPeriodInDays * 86400;
 
         emit MooveTokenCreated(i_tokenContractAddress, _name, _symbol, msg.sender, _cap, _tokenPrice);
@@ -212,6 +236,8 @@ contract GovernanceDAO is ReentrancyGuard{
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__AlreadyDelegatee();}
 
+        MooveStakingManager.lockStakedTokens(msg.sender);
+
         for (uint i = 0; i < delegatees.length; i++) {
         if (delegatees[i] == msg.sender) {
             return;
@@ -251,21 +277,51 @@ contract GovernanceDAO is ReentrancyGuard{
     }
 
     function voteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters {
-        Proposal memory proposal = proposalsById[_proposalId];
-        if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
-        if(voteListById[_proposalId][msg.sender]){revert GovernanceDAO__VoteAlreadyRegistered();}
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__YourVoteIsDelegated();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeHasTheirOwnFunctionToVote();}
         if(_vote > (type(VoteOptions).max) ){revert GovernanceDAO__InvalideVoteOption();}
+        Proposal memory proposal = proposalsById[_proposalId];
+        if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
+        if(voteListById[_proposalId][msg.sender]){revert GovernanceDAO__VoteAlreadyRegistered();}
+
+        MooveStakingManager.lockStakedTokens(msg.sender);
+        uint256 votingPower = MooveStakingManager.getUserStakedTokens(msg.sender);
 
         if(_vote == VoteOptions.InFavor){
-
+            proposal.forVotes += votingPower;
         } else if(_vote == VoteOptions.Against){
-
+            proposal.againstVotes += votingPower;
         } else if(_vote == VoteOptions.Abstain){
-
+            proposal.abstainVotes += votingPower;
         }
 
+        voteListById[_proposalId][msg.sender] = true;
+
+        emit SingleVoteRegistered(msg.sender, _vote, votingPower, _proposalId);
+    }
+
+    function delegateeVoteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters{
+        if(!checkIfDelegatee(msg.sender)){revert GovernanceDAO__NotAppliedDelegatee();}
+        if(_vote > (type(VoteOptions).max) ){revert GovernanceDAO__InvalideVoteOption();}
+        Proposal memory proposal = proposalsById[_proposalId];
+        if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
+        if(voteListById[_proposalId][msg.sender]){revert GovernanceDAO__VoteAlreadyRegistered();}
+
+        uint256 votingPower;
+        for(uint256 i= 0; i > delegateeToDelegators[msg.sender].length ; i++){
+            votingPower += MooveStakingManager.getUserStakedTokens(delegateeToDelegators[msg.sender][i]);      
+        }
+
+        if(_vote == VoteOptions.InFavor){
+            proposal.forVotes += votingPower;
+        } else if(_vote == VoteOptions.Against){
+            proposal.againstVotes += votingPower;
+        } else if(_vote == VoteOptions.Abstain){
+            proposal.abstainVotes += votingPower;
+        }
+
+        voteListById[_proposalId][msg.sender] = true;
+        emit DelegateeVoteRegistered(msg.sender, _vote, votingPower, _proposalId, delegateeToDelegators[msg.sender]);
     }
 
 
@@ -338,7 +394,5 @@ contract GovernanceDAO is ReentrancyGuard{
         isTradingAllowed = !isTradingAllowed; 
         emit TradingStatusChanged(isTradingAllowed);
     }
-
-
 
 }

@@ -54,6 +54,8 @@ contract StakingTokenManager is ReentrancyGuard {
         i_slashingPercent = _slashingPercent;
     }
 
+//functions
+
     function stakeTokens(uint256 _amount) external {
         bool transferSuccess = i_tokenAddress.transferFrom(msg.sender, address(this), _amount);
         if (!transferSuccess) {revert StakingTokenManager__TransferToStakingFailed();}
