@@ -17,10 +17,12 @@ contract StakingTokenManager is ReentrancyGuard {
     error StakingTokenManager__TokensLockedDueToActiveProposal();
     error StakingTokenManager__TokensAlreadyLocked();
     error StakingTokenManager__NoTokensToUnlock();
+    error StakingTokenManager__SlashingTransferFailed();
 
 //events
     event TokensStaked(address indexed user, uint256 amount, uint256 timestamp);
     event TokensUnstaked(address indexed user, uint256 amount, uint256 timestamp);
+    event TokenSlashed(address indexed user, uint256 amount, uint256 timestamp);
 
 //modifiers
     modifier onlyOwner() {
@@ -87,14 +89,23 @@ contract StakingTokenManager is ReentrancyGuard {
         lockedStakedTokens[_address] = false;
     }
 
-    function tokenSlasher(address _slashingTarget) external {
+    function tokenSlasher(address _slashingTarget) external onlyDAO {
+        uint256 tokenBalance = stakingBalances[_slashingTarget];
+        uint256 salshingAmount = (tokenBalance * i_slashingPercent) / 100;
+        tokenBalance = stakingBalances[_slashingTarget] -= salshingAmount;
 
+        bool transferSuccess = i_tokenAddress.transferFrom(_slashingTarget, address(i_DaoContractAddress), tokenBalance);
+        if (!transferSuccess) {revert StakingTokenManager__SlashingTransferFailed();}
+
+        emit TokenSlashed(_slashingTarget, salshingAmount, block.timestamp);
     }
 
     function getUserStakedTokens(address _address) external view onlyDAO returns(uint256) {
         return stakingBalances[_address];
     }
 
-    function getDelegateeList() public {}
+    function checkIfTokensAreLocked(address _address) external view returns (bool){
+        return lockedStakedTokens[_address];
+    }
 
 }

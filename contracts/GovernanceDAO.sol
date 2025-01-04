@@ -92,6 +92,11 @@ contract GovernanceDAO is ReentrancyGuard{
         Abstain
     }
 
+    struct ProposalVoteDatabase {
+        uint256 proposalId;
+        mapping (address => uint256) voteFor;
+    }
+
     struct Proposal {
         uint256 proposalId;
         address proposer;
@@ -102,13 +107,12 @@ contract GovernanceDAO is ReentrancyGuard{
         uint againstVotes;
         uint abstainVotes;
         bool isFinalized;
-        bool isApproved;
-        
+        bool isApproved;  
     }
 
 //variables and mappings
     mapping (uint256 => Proposal) public proposalsById;
-    mapping(uint256 => mapping(address => bool)) public voteListById;
+    mapping (uint256 => mapping(address => bool)) public voteListById;
     mapping (address => bool) public activeProposers;
     mapping (address => address[]) public delegateeToDelegators;
     address[] public delegatees; 
@@ -224,6 +228,7 @@ contract GovernanceDAO is ReentrancyGuard{
         uint256 currentProposalId = proposal.proposalId;
         proposalsById[currentProposalId] = proposal;
         activeProposers[msg.sender] = true;
+
         MooveStakingManager.lockStakedTokens(msg.sender);
 
         proposalIdCounter++;    
@@ -246,6 +251,8 @@ contract GovernanceDAO is ReentrancyGuard{
         delegatees.push(msg.sender);
     }
 
+    //FUNZIONE PER TOGLIERSI DAI POSSIBILI DELEGATORI   
+
     function delegateVote(address _delegatee) public onlyEligibleVoters{
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__AlreadyDelegator();}
@@ -258,17 +265,19 @@ contract GovernanceDAO is ReentrancyGuard{
         emit VoteDelegated(msg.sender, _delegatee, tokensDelegated);
     }
 
-    function undelegateVote() public onlyEligibleVoters {
-        address[] storage delegators = delegateeToDelegators[msg.sender];
-        if(delegators.length == 0){revert GovernanceDAO__NoDelegationFound();}
-        //aggiungere condizioni per votazioni in corso
-        
-        for (uint i = 0; i < delegators.length; i++) {
-            if (delegators[i] == msg.sender) {
-                delegators[i] = delegators[delegators.length - 1];
-                delegators.pop();
-                break;
-            }
+    function undelegateVote(address _delegatee) public onlyEligibleVoters {
+        if(!checkIfDelegator(msg.sender)){revert GovernanceDAO__NoDelegationFound();}
+        if(!checkIfDelegatee(_delegatee)){revert GovernanceDAO__NotAppliedDelegatee();}
+        //controllo che non ci siano voti attivi in corso
+
+        (bool isInDelegators, uint256 arrayIndex) = isSenderInDelegators(_delegatee, msg.sender);
+        address[] storage delegators = delegateeToDelegators[_delegatee];
+       
+        if (!isInDelegators) {
+            revert GovernanceDAO__NoDelegationFound();
+        } else {
+            delegators[arrayIndex] = delegators[delegators.length - 1];
+            delegators.pop();
         }
         
         MooveStakingManager.unlockStakedTokens(msg.sender);
@@ -324,6 +333,11 @@ contract GovernanceDAO is ReentrancyGuard{
         emit DelegateeVoteRegistered(msg.sender, _vote, votingPower, _proposalId, delegateeToDelegators[msg.sender]);
     }
 
+    function finalizeProposal(uint256 _proposalId) public onlyOwner {
+        //togliere la proposal dal mapping AddressToActiveProposalVote
+        //togliere il proposer dal mapping active proposer
+    }
+
 
     //view functions
     function getVotePeriodActive(uint256 _id) view external returns(bool){   
@@ -351,6 +365,20 @@ contract GovernanceDAO is ReentrancyGuard{
             }
         }
         return true;
+    }
+
+    function isSenderInDelegators(address _delegatee, address _delegator) public view returns (bool, uint256) {
+        address[] memory delegators = delegateeToDelegators[_delegatee];
+        for (uint i = 0; i < delegators.length; i++) {
+            if (delegators[i] == _delegator) {
+                return (true, i);
+            }
+        }
+        return (false, 0); 
+    }
+
+    function checkIfActiveProposalVote(address _voter) public view returns (bool){
+        
     }
 
 
