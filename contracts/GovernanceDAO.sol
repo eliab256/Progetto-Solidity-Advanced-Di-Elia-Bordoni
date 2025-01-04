@@ -48,6 +48,7 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__VoteAlreadyRegistered();
     error GovernanceDAO__YourVoteIsDelegated();
     error GovernanceDAO__InvalideVoteOption();
+    error GovernanceDAO__DelegateeVotedAnActiveProposal();
     error GovernanceDAO__DelegateeHasTheirOwnFunctionToVote();
     
 //event
@@ -94,7 +95,9 @@ contract GovernanceDAO is ReentrancyGuard{
 
     struct ProposalVoteDatabase {
         uint256 proposalId;
-        mapping (address => uint256) voteFor;
+        mapping (address => uint256) voteForTracker;
+        mapping (address => uint256) voteAgainstTracker;
+        mapping (address => uint256) voteAbstainTraker;
     }
 
     struct Proposal {
@@ -112,7 +115,7 @@ contract GovernanceDAO is ReentrancyGuard{
 
 //variables and mappings
     mapping (uint256 => Proposal) public proposalsById;
-    mapping (uint256 => mapping(address => bool)) public voteListById;
+    mapping (uint256 => ProposalVoteDatabase) public votesById;
     mapping (address => bool) public activeProposers;
     mapping (address => address[]) public delegateeToDelegators;
     address[] public delegatees; 
@@ -197,10 +200,6 @@ contract GovernanceDAO is ReentrancyGuard{
 
 //functions
 
-    function getMinimumTokenStakedToMakeAProposal() public view returns(uint256) {
-        return minimumTokenStakedToMakeAProposal;
-    }
-
     function makeProposal(string calldata _proposalDescription) external onlyEligibleToProposeOrDelegatee {
         if (bytes(_proposalDescription).length <= 0) {revert GovernanceDao__DescriptionCannotBeEmpty();}
 
@@ -249,6 +248,37 @@ contract GovernanceDAO is ReentrancyGuard{
             }
         }
         delegatees.push(msg.sender);
+        //aggiungere evento delatee dispnibile
+    }
+
+    function rejectForDelegate() public {
+        if(!checkIfDelegatee(msg.sender)){revert GovernanceDAO__NotAppliedDelegatee();}
+        for(uint i; i < proposalIdCounter; i++){
+           Proposal memory proposal = getProposalById(i);
+           bool delegateeVote = checkVoteById(i, msg.sender);
+           if(!proposal.isApproved && delegateeVote){revert GovernanceDAO__DelegateeVotedAnActiveProposal();}
+        }
+
+        for(uint i; i< delegatees.length; i++){
+            if(delegatees[i] == msg.sender){
+                delegatees[i] = address(0);
+            }
+        }
+
+        for(uint i; ; i++ ){
+            if(delegateeToDelegators[msg.sender][i] != address(0)){
+                address delegator = delegateeToDelegators[msg.sender][i];
+                MooveStakingManager.unlockStakedTokens(delegator);
+                //aggiungere evento e controllare che non venga già emesso dal contratto di staking
+            } else break;
+        }
+
+        delete delegateeToDelegators[msg.sender];
+
+        MooveStakingManager.unlockStakedTokens(msg.sender);
+        //aggiungere evento e controllare che non venga già emesso dal contratto di staking
+
+
     }
 
     //FUNZIONE PER TOGLIERSI DAI POSSIBILI DELEGATORI   
@@ -268,7 +298,12 @@ contract GovernanceDAO is ReentrancyGuard{
     function undelegateVote(address _delegatee) public onlyEligibleVoters {
         if(!checkIfDelegator(msg.sender)){revert GovernanceDAO__NoDelegationFound();}
         if(!checkIfDelegatee(_delegatee)){revert GovernanceDAO__NotAppliedDelegatee();}
-        //controllo che non ci siano voti attivi in corso
+     
+        for(uint i; i < proposalIdCounter; i++){
+           Proposal memory proposal = getProposalById(i);
+           bool delegateeVote = checkVoteById(i, _delegatee);
+           if(!proposal.isApproved && delegateeVote){revert GovernanceDAO__DelegateeVotedAnActiveProposal();}
+        }
 
         (bool isInDelegators, uint256 arrayIndex) = isSenderInDelegators(_delegatee, msg.sender);
         address[] storage delegators = delegateeToDelegators[_delegatee];
@@ -291,20 +326,23 @@ contract GovernanceDAO is ReentrancyGuard{
         if(_vote > (type(VoteOptions).max) ){revert GovernanceDAO__InvalideVoteOption();}
         Proposal memory proposal = proposalsById[_proposalId];
         if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
-        if(voteListById[_proposalId][msg.sender]){revert GovernanceDAO__VoteAlreadyRegistered();}
+        if(checkVoteById(_proposalId, msg.sender)){revert GovernanceDAO__VoteAlreadyRegistered();}
 
         MooveStakingManager.lockStakedTokens(msg.sender);
         uint256 votingPower = MooveStakingManager.getUserStakedTokens(msg.sender);
 
+        ProposalVoteDatabase storage voteDatabase = votesById[_proposalId];
+
         if(_vote == VoteOptions.InFavor){
             proposal.forVotes += votingPower;
+            voteDatabase.voteForTracker[msg.sender] = votingPower;
         } else if(_vote == VoteOptions.Against){
             proposal.againstVotes += votingPower;
+            voteDatabase.voteAgainstTracker[msg.sender] = votingPower;
         } else if(_vote == VoteOptions.Abstain){
             proposal.abstainVotes += votingPower;
+            voteDatabase.voteAbstainTraker[msg.sender] = votingPower;
         }
-
-        voteListById[_proposalId][msg.sender] = true;
 
         emit SingleVoteRegistered(msg.sender, _vote, votingPower, _proposalId);
     }
@@ -314,22 +352,26 @@ contract GovernanceDAO is ReentrancyGuard{
         if(_vote > (type(VoteOptions).max) ){revert GovernanceDAO__InvalideVoteOption();}
         Proposal memory proposal = proposalsById[_proposalId];
         if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
-        if(voteListById[_proposalId][msg.sender]){revert GovernanceDAO__VoteAlreadyRegistered();}
+        if(checkVoteById(_proposalId, msg.sender)){revert GovernanceDAO__VoteAlreadyRegistered();}
 
         uint256 votingPower;
         for(uint256 i= 0; i > delegateeToDelegators[msg.sender].length ; i++){
             votingPower += MooveStakingManager.getUserStakedTokens(delegateeToDelegators[msg.sender][i]);      
         }
 
+        ProposalVoteDatabase storage voteDatabase = votesById[_proposalId];
+
         if(_vote == VoteOptions.InFavor){
             proposal.forVotes += votingPower;
+            voteDatabase.voteForTracker[msg.sender] = votingPower;
         } else if(_vote == VoteOptions.Against){
             proposal.againstVotes += votingPower;
+            voteDatabase.voteAgainstTracker[msg.sender] = votingPower;
         } else if(_vote == VoteOptions.Abstain){
             proposal.abstainVotes += votingPower;
+            voteDatabase.voteAbstainTraker[msg.sender] = votingPower;
         }
-
-        voteListById[_proposalId][msg.sender] = true;
+        
         emit DelegateeVoteRegistered(msg.sender, _vote, votingPower, _proposalId, delegateeToDelegators[msg.sender]);
     }
 
@@ -340,6 +382,10 @@ contract GovernanceDAO is ReentrancyGuard{
 
 
     //view functions
+    function getMinimumTokenStakedToMakeAProposal() public view returns(uint256) {
+        return minimumTokenStakedToMakeAProposal;
+    }
+
     function getVotePeriodActive(uint256 _id) view external returns(bool){   
         Proposal memory proposal = proposalsById[_id];
         if(proposal.endVotingTimestamp == 0){revert GovernanceDAO__InvalidId();}
@@ -377,10 +423,20 @@ contract GovernanceDAO is ReentrancyGuard{
         return (false, 0); 
     }
 
-    function checkIfActiveProposalVote(address _voter) public view returns (bool){
-        
+    function getProposalById(uint256 _proposalId) public view returns (Proposal memory){
+        return proposalsById[_proposalId];
     }
 
+    function checkVoteById(uint256 _proposalId, address _voter) public view returns (bool){
+        ProposalVoteDatabase storage votersList = votesById[_proposalId];
+        if(votersList.voteForTracker[_voter] > 0){
+            return true;
+        } else if (votersList.voteAgainstTracker[_voter] > 0){
+            return true;
+        } else if(votersList.voteAbstainTraker[_voter] > 0){
+            return true;
+        } else return false;
+    }
 
 
     //functions to handle token trading
