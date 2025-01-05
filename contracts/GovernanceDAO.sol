@@ -66,6 +66,8 @@ contract GovernanceDAO is ReentrancyGuard{
     event VoteUndelegated(address indexed delegant, uint256 tokenAmountUndelegated);
     event SingleVoteRegistered(address indexed voter, VoteOptions indexed vote, uint256 votingPower, uint256 indexed proposalId);
     event DelegateeVoteRegistered(address indexed voter, VoteOptions indexed vote, uint256 votingPower, uint256 indexed proposalId, address[] delegators);
+    event NewDelegateeApplied(address indexed newDelegatee);
+    event DelegateeRemvedFromAppliedList(address indexed delegatee);
 
 //modifiers
     modifier onlyOwner() {
@@ -248,7 +250,7 @@ contract GovernanceDAO is ReentrancyGuard{
             }
         }
         delegatees.push(msg.sender);
-        //aggiungere evento delatee dispnibile
+        emit NewDelegateeApplied(msg.sender);
     }
 
     function rejectForDelegate() public {
@@ -269,16 +271,13 @@ contract GovernanceDAO is ReentrancyGuard{
             if(delegateeToDelegators[msg.sender][i] != address(0)){
                 address delegator = delegateeToDelegators[msg.sender][i];
                 MooveStakingManager.unlockStakedTokens(delegator);
-                //aggiungere evento e controllare che non venga già emesso dal contratto di staking
             } else break;
         }
 
         delete delegateeToDelegators[msg.sender];
 
         MooveStakingManager.unlockStakedTokens(msg.sender);
-        //aggiungere evento e controllare che non venga già emesso dal contratto di staking
-
-
+        emit DelegateeRemvedFromAppliedList(msg.sender);
     }
 
     //FUNZIONE PER TOGLIERSI DAI POSSIBILI DELEGATORI   

@@ -23,6 +23,8 @@ contract StakingTokenManager is ReentrancyGuard {
     event TokensStaked(address indexed user, uint256 amount, uint256 timestamp);
     event TokensUnstaked(address indexed user, uint256 amount, uint256 timestamp);
     event TokenSlashed(address indexed user, uint256 amount, uint256 timestamp);
+    event TokenLoched(address indexed user, uint256 timestamp);
+    event TokenUnlocked(address indexed user, uint256 timestamp);
 
 //modifiers
     modifier onlyOwner() {
@@ -82,11 +84,13 @@ contract StakingTokenManager is ReentrancyGuard {
     function lockStakedTokens(address _address) external onlyDAO{
         if(lockedStakedTokens[_address]){revert StakingTokenManager__TokensAlreadyLocked(); }
         lockedStakedTokens[_address] = true;
+        emit TokenLoched(_address, block.timestamp);
     }
 
     function unlockStakedTokens(address _address) external onlyDAO{
         if(!lockedStakedTokens[_address]){revert StakingTokenManager__NoTokensToUnlock(); }
         lockedStakedTokens[_address] = false;
+        emit TokenUnlocked(_address, block.timestamp);
     }
 
     function tokenSlasher(address _slashingTarget) external onlyDAO {
