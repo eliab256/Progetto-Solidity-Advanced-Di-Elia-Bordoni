@@ -21,8 +21,8 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
 //events
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
-    event Claimed (address indexed claimant, uint256 amount);
-    event SuccesfulTransferToTreasury(uint256 amount);
+    event Claimed (address indexed claimant, uint256 amount, uint256 timestamp);
+    event SuccesfulTransferToTreasury(uint256 amount, uint256 timestamp);
 
 //Modifiers
     modifier onlyOwner() {
@@ -211,7 +211,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     receive() external payable{
         bool sendSuccess = payable(i_Treasury).send(msg.value);
         if(sendSuccess){
-            emit SuccesfulTransferToTreasury(msg.value);
+            emit SuccesfulTransferToTreasury(msg.value, block.timestamp);
         } else {
             revert GovernanceToken__ETHTransferToTreasuryFailed();  
         }
@@ -221,7 +221,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     fallback() external payable{
         (bool sendSuccess, ) = payable(i_Treasury).call{value: msg.value}(msg.data);
          if(sendSuccess){
-            emit SuccesfulTransferToTreasury(msg.value);
+            emit SuccesfulTransferToTreasury(msg.value, block.timestamp);
         } else {
             revert GovernanceToken__ETHTransferToTreasuryFailed();  
         }
