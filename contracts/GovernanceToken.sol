@@ -17,12 +17,14 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     error GovernanceToken__CapMustBeGreaterThanZero();
     error GovernanceToken__TokenPriceMustBeGreaterThanZero();
     error GovernanceToken__InsufficientBalance();
-    error GovernanceToken__ETHTransferToTreasuryFailed();
+    error GovernanceToken__SendETHToGovernanceContractToBuyTokens(address _governanceContractAddress);
+    error GovernanceToken__UseGovernanceContractToInteractWithTheDAO(address _governanceContractAddress);
 
 //events
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
     event Claimed (address indexed claimant, uint256 amount, uint256 timestamp);
-    event SuccesfulTransferToTreasury(address sender, uint256 amount, uint256 timestamp);
+    event ReceiveTriggered(address sender, uint256 amount, uint256 timestamp);
+    event FallbackTriggered(address sender, uint256 amount, bytes data, uint256 timestamp);
 
 //Modifiers
     modifier onlyOwner() {
@@ -208,24 +210,15 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
     receive() external payable{
-        bool sendSuccess = payable(i_treasuryContract).send(msg.value);
-        if(sendSuccess){
-            emit SuccesfulTransferToTreasury(msg.sender, msg.value, block.timestamp);
-        } else {
-            revert GovernanceToken__ETHTransferToTreasuryFailed();  
-        }
-
+        emit ReceiveTriggered(msg.sender, msg.value, block.timestamp);
+        revert GovernanceToken__SendETHToGovernanceContractToBuyTokens(i_DAOContract);
+    
     }
 
     fallback() external payable{
-        (bool sendSuccess, ) = payable(i_treasuryContract).call{value: msg.value}(msg.data);
-         if(sendSuccess){
-            emit SuccesfulTransferToTreasury(msg.sender, msg.value, block.timestamp);
-        } else {
-            revert GovernanceToken__ETHTransferToTreasuryFailed();  
-        }
+        emit FallbackTriggered(msg.sender, msg.value, msg.data, block.timestamp);
+        revert GovernanceToken__UseGovernanceContractToInteractWithTheDAO(i_DAOContract);
+        
     }
-
-
 
 }

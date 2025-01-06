@@ -9,6 +9,7 @@ contract StakingTokenManager is ReentrancyGuard {
 
 //custom errors 
     error StakingTokenManager__TransferToStakingFailed();
+    error StakingTokenManager__NoAvailableTokensToStake();
     error StakingTokenManager__NoTokensStaked();
     error StakingTokenManager__AmountHigherThanStakedTokens();
     error StakingTokenManager__TransferTounstakeFailed();
@@ -18,6 +19,8 @@ contract StakingTokenManager is ReentrancyGuard {
     error StakingTokenManager__TokensAlreadyLocked();
     error StakingTokenManager__NoTokensToUnlock();
     error StakingTokenManager__SlashingTransferFailed();
+    error StakingTokenManager__SendETHToGovernanceContractToBuyTokens(address _DAOAddress);
+    error StakingTokenManager__UseGovernanceContractToInteractWithTheDAO(address _DAOAddress);
 
 //events
     event TokensStaked(address indexed user, uint256 amount, uint256 timestamp);
@@ -25,6 +28,9 @@ contract StakingTokenManager is ReentrancyGuard {
     event TokenSlashed(address indexed user, uint256 amount, uint256 timestamp);
     event TokenLoched(address indexed user, uint256 timestamp);
     event TokenUnlocked(address indexed user, uint256 timestamp);
+    event ReceiveTriggered(address sender, uint256 amount, uint256 timestamp);
+    event FallbackTriggered(address sender, uint256 amount, bytes data, uint256 timestamp);
+
 
 //modifiers
     modifier onlyOwner() {
@@ -61,10 +67,12 @@ contract StakingTokenManager is ReentrancyGuard {
 
 //functions
     function stakeTokens(uint256 _amount) external {
+        if(i_tokenContract.balanceOf(msg.sender) <= 0){revert StakingTokenManager__NoAvailableTokensToStake();}
+        stakingBalances[msg.sender] += _amount;
+
         bool transferSuccess = i_tokenContract.transferFrom(msg.sender, address(this), _amount);
         if (!transferSuccess) {revert StakingTokenManager__TransferToStakingFailed();}
 
-        stakingBalances[msg.sender] += _amount;
         emit TokensStaked(msg.sender, _amount, block.timestamp);
     }
 
@@ -111,5 +119,18 @@ contract StakingTokenManager is ReentrancyGuard {
     function checkIfTokensAreLocked(address _address) external view returns (bool){
         return lockedStakedTokens[_address];
     }
+
+    receive() external payable{
+        emit ReceiveTriggered(msg.sender, msg.value, block.timestamp);
+        revert StakingTokenManager__SendETHToGovernanceContractToBuyTokens(i_DAOContract);
+    
+    }
+
+    fallback() external payable{
+        emit FallbackTriggered(msg.sender, msg.value, msg.data, block.timestamp);
+        revert StakingTokenManager__UseGovernanceContractToInteractWithTheDAO(i_DAOContract);
+        
+    }
+
 
 }

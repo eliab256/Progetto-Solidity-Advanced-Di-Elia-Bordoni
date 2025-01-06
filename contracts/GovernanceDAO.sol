@@ -55,6 +55,9 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__NotOwner();
     error GovernanceDAO__NotEnoughtTokenToVote();
     error GovernanceDAO__NotEnoughtTokenStakedToMakeProposal(uint256 _stakedToken, uint256 _tokenStakedYouNeed);
+    //receive and fallback errors
+    error GovernanceDAO__ToSendETHUseDepositFunction();
+    error GovernanceDAO__NoFunctionCalled();
     
 //event
     //contructor events
@@ -78,6 +81,8 @@ contract GovernanceDAO is ReentrancyGuard{
     event NewTokenPriceSet(uint256 indexed _newPrice, uint256 blocktimestamp);
     event SuccesfulTransferToTreasury(address sender, uint256 amount, uint256 blocktimestamp);
     event FailedTransferToTreasury(uint256 amount, uint256 blocktimestamp);
+    event ReceiveTriggered(address sender, uint256 amount, uint256 timestamp);
+    event FallbackTriggered(address sender, uint256 amount, bytes data, uint256 timestamp);
 
 //modifiers
     modifier onlyOwner() {
@@ -520,14 +525,18 @@ contract GovernanceDAO is ReentrancyGuard{
         emit TradingStatusChanged(isTradingAllowed, block.timestamp);
     }
 
-    receive() external payable{
-        bool sendSuccess = payable(i_treasuryContract).send(msg.value);
-        if(sendSuccess){
-            emit SuccesfulTransferToTreasury(msg.sender, msg.value, block.timestamp);
-        } else {
-            revert GovernanceDAO__ETHTransferToTreasuryFailed();  
-        }
+    //aggiungere deposit e sendToTreasury
 
+    receive() external payable{
+        emit ReceiveTriggered(msg.sender, msg.value, block.timestamp);
+        revert GovernanceDAO__ToSendETHUseDepositFunction();
+    
+    }
+
+    fallback() external payable{
+        emit FallbackTriggered(msg.sender, msg.value, msg.data, block.timestamp);
+        revert GovernanceDAO__NoFunctionCalled();
+        
     }
 
 }
