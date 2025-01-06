@@ -51,6 +51,8 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__ETHTransferToTreasuryFailed();
     error GovernanceDAO__TradingIsNotAllowed();
     error GovernanceDAO__InsufficientBalance();
+    error GovernanceDAO__ImportMustBeHigherThanZero();
+    error GovernanceDAO__TryingToWithdrawMoreETHThenBalance(uint256 _amountWithdraw, uint256 _contractBalance);
     //modifiers errors
     error GovernanceDAO__NotOwner();
     error GovernanceDAO__NotEnoughtTokenToVote();
@@ -79,7 +81,8 @@ contract GovernanceDAO is ReentrancyGuard{
     event TradingStatusChanged (bool tradingIsAllowed, uint256 blocktimestamp);
     event TokenPurchased(address indexed _buyer, uint256 indexed _amount, uint256 blocktimestamp);
     event NewTokenPriceSet(uint256 indexed _newPrice, uint256 blocktimestamp);
-    event SuccesfulTransferToTreasury(address sender, uint256 amount, uint256 blocktimestamp);
+    event ETHDeposit(uint256 _amount, address indexed _sender, uint256 blocktimestamp);
+    event SuccesfulTransferToTreasury(uint256 amount, uint256 blocktimestamp);
     event FailedTransferToTreasury(uint256 amount, uint256 blocktimestamp);
     event ReceiveTriggered(address sender, uint256 amount, uint256 timestamp);
     event FallbackTriggered(address sender, uint256 amount, bytes data, uint256 timestamp);
@@ -419,8 +422,6 @@ contract GovernanceDAO is ReentrancyGuard{
         activeProposers[proposal.proposer] = false;
     }
 
-
-
     //view functions
     function getMinimumTokenStakedToMakeAProposal() public view returns(uint256) {
         return minimumTokenStakedToMakeAProposal;
@@ -484,7 +485,6 @@ contract GovernanceDAO is ReentrancyGuard{
         } else return false;
     }
 
-
     //functions to handle token trading
     function buyToken() public payable {
         if(isTradingAllowed == false){revert GovernanceDAO__TradingIsNotAllowed();}
@@ -502,16 +502,17 @@ contract GovernanceDAO is ReentrancyGuard{
 
         MooveToken.updateElegibleAdresses(msg.sender);
 
-        bool sendSuccess = payable(i_treasuryContract).send(msg.value);
-        if (!sendSuccess) {
-            emit FailedTransferToTreasury(msg.value, block.timestamp);
-        } else emit SuccesfulTransferToTreasury(msg.sender, msg.value, block.timestamp);
+        sendETHToTreasury(msg.value);
     }
 
     function getEthPrice() private view returns(uint256){
         AggregatorV3Interface dataFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306);
         (,int256 answer,,,) = dataFeed.latestRoundData();
         return uint256(answer * 1e10);
+    }
+
+    function getEthBalance() public view returns(uint256){
+        return address(this).balance;
     }
 
     function getConversionRate(uint256 _ethAmount) private view returns(uint256){
@@ -525,7 +526,20 @@ contract GovernanceDAO is ReentrancyGuard{
         emit TradingStatusChanged(isTradingAllowed, block.timestamp);
     }
 
-    //aggiungere deposit e sendToTreasury
+    function depositETH()external payable {
+        if(msg.value == 0){revert GovernanceDAO__ImportMustBeHigherThanZero();}
+        emit ETHDeposit(msg.value, msg.sender, block.timestamp);
+
+    }
+
+    function sendETHToTreasury(uint256 _amount) public onlyOwner{
+        if(_amount <= 0){revert GovernanceDAO__InvalidInputValue();}
+        if(_amount > address(this).balance){revert GovernanceDAO__TryingToWithdrawMoreETHThenBalance(_amount, address(this).balance);}
+        bool sendSuccess = payable(i_treasuryContract).send(_amount);
+        if (!sendSuccess) {
+            emit FailedTransferToTreasury(_amount, block.timestamp);
+        } else emit SuccesfulTransferToTreasury(_amount, block.timestamp);
+    }
 
     receive() external payable{
         emit ReceiveTriggered(msg.sender, msg.value, block.timestamp);
