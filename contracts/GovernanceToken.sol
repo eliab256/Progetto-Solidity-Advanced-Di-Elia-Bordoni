@@ -22,7 +22,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 //events
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
     event Claimed (address indexed claimant, uint256 amount, uint256 timestamp);
-    event SuccesfulTransferToTreasury(uint256 amount, uint256 timestamp);
+    event SuccesfulTransferToTreasury(address sender, uint256 amount, uint256 timestamp);
 
 //Modifiers
     modifier onlyOwner() {
@@ -31,7 +31,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
     modifier onlyDAO(){
-        if(msg.sender != i_DAO){revert GovernanceToken__NotDAO();}
+        if(msg.sender != i_DAOContract){revert GovernanceToken__NotDAO();}
         _;
     }
     
@@ -52,7 +52,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
 
-//variables declaration
+//variables and mapping
 
     //about time
     uint256 public immutable i_deployTimeStamp;
@@ -66,8 +66,8 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     
     //special addresses
     address public immutable i_Owner;
-    address public immutable i_DAO;
-    address public immutable i_Treasury;
+    address public immutable i_DAOContract;
+    address public immutable i_treasuryContract;
 
     //token and vesting 
     uint256 private immutable i_cap;
@@ -76,7 +76,6 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     
     bool private vestingPeriod = false;
 
-    //mapping (address => bool) elegibleForClaims;
     mapping (uint256 => address) elegibleForClaims; 
     mapping (address => uint256) claimsAmountForAddress;
     uint256 private index;   
@@ -103,8 +102,8 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         //se questi controlli sono già presenti nel contratto di governance posso cancellare questi?
 
         i_Owner = _teamAddress;
-        i_DAO = _DAOAddress;
-        i_Treasury = _treasuryAddress;
+        i_DAOContract = _DAOAddress;
+        i_treasuryContract = _treasuryAddress;
         i_cap = _cap;
         tokenPrice = _tokenPrice;
 
@@ -135,7 +134,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
             i_earlyAdopterMintSupply = _earlyAdopterMintSupply;
         }
 
-        _transfer(address(this),i_DAO,balanceOf(address(this)) - i_earlyAdopterMintSupply * 10 ** decimals());
+        _transfer(address(this),i_DAOContract,balanceOf(address(this)) - i_earlyAdopterMintSupply * 10 ** decimals());
 
         emit TokenMinting(totalSupply(), i_deployTimeStamp);
     }
@@ -209,9 +208,9 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
     receive() external payable{
-        bool sendSuccess = payable(i_Treasury).send(msg.value);
+        bool sendSuccess = payable(i_treasuryContract).send(msg.value);
         if(sendSuccess){
-            emit SuccesfulTransferToTreasury(msg.value, block.timestamp);
+            emit SuccesfulTransferToTreasury(msg.sender, msg.value, block.timestamp);
         } else {
             revert GovernanceToken__ETHTransferToTreasuryFailed();  
         }
@@ -219,9 +218,9 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
     fallback() external payable{
-        (bool sendSuccess, ) = payable(i_Treasury).call{value: msg.value}(msg.data);
+        (bool sendSuccess, ) = payable(i_treasuryContract).call{value: msg.value}(msg.data);
          if(sendSuccess){
-            emit SuccesfulTransferToTreasury(msg.value, block.timestamp);
+            emit SuccesfulTransferToTreasury(msg.sender, msg.value, block.timestamp);
         } else {
             revert GovernanceToken__ETHTransferToTreasuryFailed();  
         }

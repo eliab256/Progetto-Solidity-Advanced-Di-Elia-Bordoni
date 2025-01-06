@@ -28,40 +28,40 @@ contract StakingTokenManager is ReentrancyGuard {
 
 //modifiers
     modifier onlyOwner() {
-        if(msg.sender != i_teamAddress){ revert StakingTokenManager__NotOwner();}
+        if(msg.sender != i_Owner){ revert StakingTokenManager__NotOwner();}
         _;
     }
 
     modifier onlyDAO(){
-        if(msg.sender != i_DaoContractAddress){revert StakingTokenManager__NotDAO();}
+        if(msg.sender != i_DAOContract){revert StakingTokenManager__NotDAO();}
         _;
     }
 
 //variables and mapping
-    IERC20 public immutable i_tokenAddress;
-    address immutable i_teamAddress;
-    address immutable i_DaoContractAddress;
+    IERC20 public immutable i_tokenContract;
+    address immutable i_Owner;
+    address immutable i_DAOContract;
     uint256 immutable i_slashingPercent;
 
     mapping(address => uint256) stakingBalances;
     mapping(address => bool) lockedStakedTokens;
 
+//constructor
     constructor(
         address _teamAddress, 
         address _DaoAddress, 
         address _tokenAddress,
         uint256 _slashingPercent
         ){
-        i_tokenAddress = IERC20(_tokenAddress);
-        i_teamAddress = _teamAddress;
-        i_DaoContractAddress = _DaoAddress;
+        i_tokenContract = IERC20(_tokenAddress);
+        i_Owner = _teamAddress;
+        i_DAOContract = _DaoAddress;
         i_slashingPercent = _slashingPercent;
     }
 
 //functions
-
     function stakeTokens(uint256 _amount) external {
-        bool transferSuccess = i_tokenAddress.transferFrom(msg.sender, address(this), _amount);
+        bool transferSuccess = i_tokenContract.transferFrom(msg.sender, address(this), _amount);
         if (!transferSuccess) {revert StakingTokenManager__TransferToStakingFailed();}
 
         stakingBalances[msg.sender] += _amount;
@@ -75,7 +75,7 @@ contract StakingTokenManager is ReentrancyGuard {
         if (lockedStakedTokens[msg.sender]){revert StakingTokenManager__TokensLockedDueToActiveProposal();}
 
         stakingBalances[msg.sender] = amountStaked - _amount;
-        bool trasferSuccess = i_tokenAddress.transfer(msg.sender, _amount);
+        bool trasferSuccess = i_tokenContract.transfer(msg.sender, _amount);
         if (!trasferSuccess) {revert StakingTokenManager__TransferTounstakeFailed();}
 
         emit TokensUnstaked(msg.sender, _amount, block.timestamp);
@@ -98,7 +98,7 @@ contract StakingTokenManager is ReentrancyGuard {
         uint256 salshingAmount = (tokenBalance * i_slashingPercent) / 100;
         tokenBalance = stakingBalances[_slashingTarget] -= salshingAmount;
 
-        bool transferSuccess = i_tokenAddress.transferFrom(_slashingTarget, address(i_DaoContractAddress), tokenBalance);
+        bool transferSuccess = i_tokenContract.transferFrom(_slashingTarget, address(i_DAOContract), tokenBalance);
         if (!transferSuccess) {revert StakingTokenManager__SlashingTransferFailed();}
 
         emit TokenSlashed(_slashingTarget, salshingAmount, block.timestamp);

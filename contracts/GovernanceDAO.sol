@@ -76,12 +76,12 @@ contract GovernanceDAO is ReentrancyGuard{
     event TradingStatusChanged (bool tradingIsAllowed, uint256 blocktimestamp);
     event TokenPurchased(address indexed _buyer, uint256 indexed _amount, uint256 blocktimestamp);
     event NewTokenPriceSet(uint256 indexed _newPrice, uint256 blocktimestamp);
-    event SuccesfulTransferToTreasury(uint256 amount, uint256 blocktimestamp);
+    event SuccesfulTransferToTreasury(address sender, uint256 amount, uint256 blocktimestamp);
     event FailedTransferToTreasury(uint256 amount, uint256 blocktimestamp);
 
 //modifiers
     modifier onlyOwner() {
-        if(msg.sender != i_teamAddress){ revert GovernanceDAO__NotOwner();}
+        if(msg.sender != i_Owner){ revert GovernanceDAO__NotOwner();}
         _;
     }
 
@@ -134,10 +134,10 @@ contract GovernanceDAO is ReentrancyGuard{
     mapping (address => address[]) public delegateeToDelegators;
     address[] public delegatees; 
 
-    address immutable i_teamAddress;
-    address immutable i_tokenContractAddress;
-    address immutable i_treasuryContractAddress;
-    address immutable i_stakingContractAddress; 
+    address immutable i_Owner;
+    address immutable i_tokenContract;
+    address immutable i_treasuryContract;
+    address immutable i_stakingContract; 
 
     uint256 public tokenPrice = MooveToken.getPrice() * 10 ** MooveToken.decimals();
     bool public isTradingAllowed;
@@ -198,17 +198,17 @@ contract GovernanceDAO is ReentrancyGuard{
 
         MooveStakingManager = new StakingTokenManager(msg.sender, address(this), address(MooveToken), _slashingPercent);
 
-        i_tokenContractAddress = address(MooveToken);
-        i_treasuryContractAddress = address(MooveTreasury);
-        i_teamAddress = msg.sender;
-        i_stakingContractAddress = address(MooveStakingManager);
+        i_tokenContract = address(MooveToken);
+        i_treasuryContract = address(MooveTreasury);
+        i_Owner = msg.sender;
+        i_stakingContract = address(MooveStakingManager);
         minimumTokenStakedToMakeAProposal = _minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals();
         minimumCirculatingSupplyToMakeAProposalInPercent = _minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
         proposalQuorumPercent = _proposalQuorumPercent;
         daysofVoting = _votingPeriodInDays * 86400;
 
-        emit MooveTokenCreated(i_tokenContractAddress, _name, _symbol, msg.sender, _cap, _tokenPrice);
-        emit MooveTreasuryCreated(i_treasuryContractAddress, msg.sender, address(this));
+        emit MooveTokenCreated(i_tokenContract, _name, _symbol, msg.sender, _cap, _tokenPrice);
+        emit MooveTreasuryCreated(i_treasuryContract, msg.sender, address(this));
         emit NewTokenPriceSet(_tokenPrice, block.timestamp);
     }
 
@@ -497,10 +497,10 @@ contract GovernanceDAO is ReentrancyGuard{
 
         MooveToken.updateElegibleAdresses(msg.sender);
 
-        bool sendSuccess = payable(i_treasuryContractAddress).send(msg.value);
+        bool sendSuccess = payable(i_treasuryContract).send(msg.value);
         if (!sendSuccess) {
             emit FailedTransferToTreasury(msg.value, block.timestamp);
-        } else emit SuccesfulTransferToTreasury(msg.value, block.timestamp);
+        } else emit SuccesfulTransferToTreasury(msg.sender, msg.value, block.timestamp);
     }
 
     function getEthPrice() private view returns(uint256){
@@ -518,6 +518,16 @@ contract GovernanceDAO is ReentrancyGuard{
     function enableTrading() external onlyOwner {
         isTradingAllowed = !isTradingAllowed; 
         emit TradingStatusChanged(isTradingAllowed, block.timestamp);
+    }
+
+    receive() external payable{
+        bool sendSuccess = payable(i_treasuryContract).send(msg.value);
+        if(sendSuccess){
+            emit SuccesfulTransferToTreasury(msg.sender, msg.value, block.timestamp);
+        } else {
+            revert GovernanceDAO__ETHTransferToTreasuryFailed();  
+        }
+
     }
 
 }
