@@ -131,5 +131,4 @@ contract StakingTokenManager is ReentrancyGuard {
         revert StakingTokenManager__UseGovernanceContractToInteractWithTheDAO(i_DAOContract);
         
     }
-
 }

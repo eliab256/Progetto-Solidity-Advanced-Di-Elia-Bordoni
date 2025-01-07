@@ -82,64 +82,75 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     mapping (address => uint256) claimsAmountForAddress;
     uint256 private index;   
 
+// Constructor Parameters Struct
+    struct TokenConstructorParams {
+        string name;
+        string symbol;
+        address teamAddress;
+        address DAOAddress;
+        address treasuryAddress;
+        uint256 teamMintSupply;
+        uint256 cap;
+        uint256 olderUsersMintSupply;
+        uint256 earlyAdopterMintSupply;
+        address[] olderUsersAddresses;
+        uint8 weeksOfVesting;
+        uint256 tokenPrice;
+    }
+
 //Constructor
-    constructor(
-        string memory _name,                    // Token name
-        string memory _symbol,                  // Token simbol
-        address _teamAddress,                   // team's address
-        address _DAOAddress,                    // DAO' s address
-        address _treasuryAddress,               // DAO's treasury address        
-        uint256 _teamMintSupply,                // Supply for the team
-        uint256 _cap,                           // Max supply 
-        uint256 _olderUsersMintSupply,          // Supply for the older users
-        uint256 _earlyAdopterMintSupply,        // Supply the users who interact with the protocol
-        address[] memory _olderUsersAddresses,  // Array of older users
-        uint8 _weeksOfVesting,                  // Duration of vesting period in weeks    
-        uint256 _tokenPrice                     // price of single token 
-    ) ERC20(_name, _symbol) {
-        uint256 totalInitalMint = _teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply;
-        if(totalInitalMint > _cap){revert GovernanceToken__MaxSupplyReached(totalInitalMint, _cap);}
-        if(_cap == 0){revert GovernanceToken__CapMustBeGreaterThanZero();}
-        if(_tokenPrice == 0){revert GovernanceToken__TokenPriceMustBeGreaterThanZero();}
-        //se questi controlli sono già presenti nel contratto di governance posso cancellare questi?
+    constructor(TokenConstructorParams memory params) ERC20(params.name, params.symbol) {
+        uint256 totalInitialMint = params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply;
+        if(totalInitialMint > params.cap){
+            revert GovernanceToken__MaxSupplyReached(totalInitialMint, params.cap);
+        }
+        if(params.cap == 0){
+            revert GovernanceToken__CapMustBeGreaterThanZero();
+        }
+        if(params.tokenPrice == 0){
+            revert GovernanceToken__TokenPriceMustBeGreaterThanZero();
+        }
 
-        i_Owner = _teamAddress;
-        i_DAOContract = _DAOAddress;
-        i_treasuryContract = _treasuryAddress;
-        i_cap = _cap;
-        tokenPrice = _tokenPrice;
+        i_Owner = params.teamAddress;
+        i_DAOContract = params.DAOAddress;
+        i_treasuryContract = params.treasuryAddress;
+        i_cap = params.cap;
+        tokenPrice = params.tokenPrice;
 
-        //sending tokens to the team
-        if(_teamMintSupply > 0){
-            i_teamMintSupply = _teamMintSupply;
-            _mint(_teamAddress, i_teamMintSupply * 10 ** decimals());
-            }
+        // Mint tokens for the team
+        if(params.teamMintSupply > 0){
+            i_teamMintSupply = params.teamMintSupply;
+            _mint(params.teamAddress, i_teamMintSupply * 10 ** decimals());
+        }
 
-        //sending tokens to older users
-        if(_olderUsersAddresses.length > 0 && _olderUsersMintSupply > 0){
-            _mint(address(this), _olderUsersMintSupply * 10 ** decimals());
-            i_olderUsersMintSupply = _olderUsersMintSupply;
+        // Mint tokens for older users
+        if(params.olderUsersAddresses.length > 0 && params.olderUsersMintSupply > 0){
+            _mint(address(this), params.olderUsersMintSupply * 10 ** decimals());
+            i_olderUsersMintSupply = params.olderUsersMintSupply;
             
-            uint256 tokenForUser = i_olderUsersMintSupply / _olderUsersAddresses.length;
-            for (uint256 i = 0; i < _olderUsersAddresses.length; i++) {   
+            uint256 tokenForUser = i_olderUsersMintSupply / params.olderUsersAddresses.length;
+            for (uint256 i = 0; i < params.olderUsersAddresses.length; i++) {   
                 require(balanceOf(address(this)) >= tokenForUser, "Not enough tokens in contract");
-                _transfer(address(this),_olderUsersAddresses[i],tokenForUser);
+                _transfer(address(this), params.olderUsersAddresses[i], tokenForUser);
             }
         }
         
-        _mint(address(this), (i_cap * 10 ** decimals())- totalSupply());
+        // Mint remaining tokens to contract
+        _mint(address(this), (params.cap * 10 ** decimals()) - totalSupply());
 
         i_deployTimeStamp = block.timestamp / 86400 * 86400;
 
-        if(_weeksOfVesting > 0 && _earlyAdopterMintSupply > 0){
-            i_weeksOfVesting = _weeksOfVesting;
-            i_earlyAdopterMintSupply = _earlyAdopterMintSupply;
+        if(params.weeksOfVesting > 0 && params.earlyAdopterMintSupply > 0){
+            i_weeksOfVesting = params.weeksOfVesting;
+            i_earlyAdopterMintSupply = params.earlyAdopterMintSupply;
         }
 
-        _transfer(address(this),i_DAOContract,balanceOf(address(this)) - i_earlyAdopterMintSupply * 10 ** decimals());
+        // Transfer tokens to DAO
+        _transfer(address(this), i_DAOContract, balanceOf(address(this)) - i_earlyAdopterMintSupply * 10 ** decimals());
 
         emit TokenMinting(totalSupply(), i_deployTimeStamp);
     }
+
 
 //functions
 

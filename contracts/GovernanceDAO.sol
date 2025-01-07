@@ -154,70 +154,79 @@ contract GovernanceDAO is ReentrancyGuard{
     uint256 public minimumTokenStakedToMakeAProposal;
     uint256 public minimumCirculatingSupplyToMakeAProposalInPercent;
     uint256 internal proposalIdCounter; 
-    uint256 public proposalQuorumPercent; 
+    uint256 public proposalQuorumPercent;
+
+// Constructor Parameters Struct
+    struct GovernanceConstructorParams {
+        string name;
+        string symbol;
+        address teamAddress;
+        address DAOAddress;
+        address treasuryAddress;
+        uint256 teamMintSupply;
+        uint256 cap;
+        uint256 olderUsersMintSupply;
+        uint256 earlyAdopterMintSupply;
+        address[] olderUsersAddresses;
+        uint8 weeksOfVesting;
+        uint256 tokenPrice;
+        uint256 minimumTokenStakedToMakeAProposal;
+        uint256 minimumCirculatingSupplyToMakeAProposalInPercent;
+        uint256 proposalQuorumPercent;
+        uint256 slashingPercent;
+        uint256 votingPeriodInDays;  
+    }
 
 //constructor
-    constructor( 
-        string memory _name,                            // Token name
-        string memory _symbol,                          // Token simbol
-        uint256 _teamMintSupply,                        // Supply for the team
-        uint256 _cap,                                   // Max supply 
-        uint256 _olderUsersMintSupply,                  // Supply for the older users
-        uint256 _earlyAdopterMintSupply,                // Supply the users who interact with the protocol
-        address[] memory _olderUsersAddresses,          // Array of older users
-        uint8 _weeksOfVesting,                          // Duration of vesting period in weeks    
-        uint256 _tokenPrice,                            // price of single token
-        uint256 _minimumTokenStakedToMakeAProposal,
-        uint256 _minimumCirculatingSupplyToMakeAProposalInPercent,
-        uint256 _proposalQuorumPercent,
-        uint256 _slashingPercent,
-        uint256 _votingPeriodInDays                     
-    ){
-        if(bytes(_name).length == 0 || bytes(_symbol).length == 0 ){revert GovernanceDAO__NameAndSymbolFieldsCantBeEmpty();}
-        uint256 totalInitalMint = _teamMintSupply + _olderUsersMintSupply + _earlyAdopterMintSupply;
-        if(totalInitalMint > _cap){revert GovernanceDAO__MaxSupplyReached(totalInitalMint, _cap);}
-        if(_cap == 0){revert GovernanceDAO__CapMustBeGreaterThanZero();}
-        if(_tokenPrice == 0){revert GovernanceDAO__TokenPriceMustBeGreaterThanZero();}
-        if(_olderUsersMintSupply > 0 && _olderUsersAddresses.length == 0){revert GovernanceDAO__OlderUsersListMustBeMoreThanZero();}
-        if(_minimumTokenStakedToMakeAProposal == 0 || _minimumTokenStakedToMakeAProposal > totalInitalMint){
+    constructor(GovernanceConstructorParams memory params){
+        if(bytes(params.name).length == 0 || bytes(params.symbol).length == 0 ){revert GovernanceDAO__NameAndSymbolFieldsCantBeEmpty();}
+        uint256 totalInitalMint = params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply;
+        if(totalInitalMint > params.cap){revert GovernanceDAO__MaxSupplyReached(totalInitalMint, params.cap);}
+        if(params.cap == 0){revert GovernanceDAO__CapMustBeGreaterThanZero();}
+        if(params.tokenPrice == 0){revert GovernanceDAO__TokenPriceMustBeGreaterThanZero();}
+        if(params.olderUsersMintSupply > 0 && params.olderUsersAddresses.length == 0){revert GovernanceDAO__OlderUsersListMustBeMoreThanZero();}
+        if(params.minimumTokenStakedToMakeAProposal == 0 || params.minimumTokenStakedToMakeAProposal > totalInitalMint){
             revert GovernanceDAO__InvalidInputValue();
         }
-        if(_minimumCirculatingSupplyToMakeAProposalInPercent > _cap){revert GovernanceDAO__CirculatingSupplyCannotExceedCap();}
-        if(_proposalQuorumPercent < 0 || _proposalQuorumPercent > 100){revert GovernanceDAO__InvalidInputValue();}
-        if(_slashingPercent < 0 || _slashingPercent > 100){revert GovernanceDAO__InvalidInputValue();}
-        if(_votingPeriodInDays == 0) {revert GovernanceDAO__InvalidInputValue();}
+        if(params.minimumCirculatingSupplyToMakeAProposalInPercent > params.cap){revert GovernanceDAO__CirculatingSupplyCannotExceedCap();}
+        if(params.proposalQuorumPercent < 0 || params.proposalQuorumPercent > 100){revert GovernanceDAO__InvalidInputValue();}
+        if(params.slashingPercent < 0 || params.slashingPercent > 100){revert GovernanceDAO__InvalidInputValue();}
+        if(params.votingPeriodInDays == 0) {revert GovernanceDAO__InvalidInputValue();}
 
         MooveTreasury = new TreasuryDAO(msg.sender, address(this)); 
 
-        MooveToken = new GovernanceToken(
-            _name,
-            _symbol,
-            msg.sender,
-            address(this),
-            address(MooveTreasury),
-            _teamMintSupply,
-            _cap, 
-            _olderUsersMintSupply,
-            _earlyAdopterMintSupply,
-            _olderUsersAddresses,
-            _weeksOfVesting,
-            _tokenPrice
-            );
+        GovernanceToken.TokenConstructorParams memory tokenParams = GovernanceToken.TokenConstructorParams({
+            name: params.name,
+            symbol: params.symbol,
+            teamAddress: msg.sender,
+            DAOAddress: address(this),
+            treasuryAddress: address(MooveTreasury),
+            teamMintSupply: params.teamMintSupply,
+            cap: params.cap,
+            olderUsersMintSupply: params.olderUsersMintSupply,
+            earlyAdopterMintSupply: params.earlyAdopterMintSupply,
+            olderUsersAddresses: params.olderUsersAddresses,
+            weeksOfVesting: params.weeksOfVesting,
+            tokenPrice: params.tokenPrice
+        });
 
-        MooveStakingManager = new StakingTokenManager(msg.sender, address(this), address(MooveToken), _slashingPercent);
+        MooveToken = new GovernanceToken(tokenParams);
+
+        MooveStakingManager = new StakingTokenManager(msg.sender, address(this), address(MooveToken), params.slashingPercent);
 
         i_tokenContract = address(MooveToken);
         i_treasuryContract = address(MooveTreasury);
         i_Owner = msg.sender;
         i_stakingContract = address(MooveStakingManager);
-        minimumTokenStakedToMakeAProposal = _minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals();
-        minimumCirculatingSupplyToMakeAProposalInPercent = _minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
-        proposalQuorumPercent = _proposalQuorumPercent;
-        daysofVoting = _votingPeriodInDays * 86400;
+        minimumTokenStakedToMakeAProposal = params.minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals();
+        minimumCirculatingSupplyToMakeAProposalInPercent = params.minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
+        proposalQuorumPercent = params.proposalQuorumPercent;
+        daysofVoting = params.votingPeriodInDays * 86400;
 
-        emit MooveTokenCreated(i_tokenContract, _name, _symbol, msg.sender, _cap, _tokenPrice);
+        emit MooveTokenCreated(i_tokenContract, params.name, params.symbol, msg.sender, params.cap, params.tokenPrice);
         emit MooveTreasuryCreated(i_treasuryContract, msg.sender, address(this));
-        emit NewTokenPriceSet(_tokenPrice, block.timestamp);
+        emit NewTokenPriceSet(params.tokenPrice, block.timestamp);
+
     }
 
 //functions
