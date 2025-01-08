@@ -160,9 +160,6 @@ contract GovernanceDAO is ReentrancyGuard{
     struct GovernanceConstructorParams {
         string name;
         string symbol;
-        address teamAddress;
-        address DAOAddress;
-        address treasuryAddress;
         uint256 teamMintSupply;
         uint256 cap;
         uint256 olderUsersMintSupply;
@@ -193,7 +190,7 @@ contract GovernanceDAO is ReentrancyGuard{
         if(params.slashingPercent < 0 || params.slashingPercent > 100){revert GovernanceDAO__InvalidInputValue();}
         if(params.votingPeriodInDays == 0) {revert GovernanceDAO__InvalidInputValue();}
 
-        MooveTreasury = new TreasuryDAO(msg.sender, address(this)); 
+        MooveTreasury = new TreasuryDAO(msg.sender); 
 
         GovernanceToken.TokenConstructorParams memory tokenParams = GovernanceToken.TokenConstructorParams({
             name: params.name,
@@ -212,7 +209,7 @@ contract GovernanceDAO is ReentrancyGuard{
 
         MooveToken = new GovernanceToken(tokenParams);
 
-        MooveStakingManager = new StakingTokenManager(msg.sender, address(this), address(MooveToken), params.slashingPercent);
+        MooveStakingManager = new StakingTokenManager(msg.sender, address(MooveToken), params.slashingPercent);
 
         i_tokenContract = address(MooveToken);
         i_treasuryContract = address(MooveTreasury);

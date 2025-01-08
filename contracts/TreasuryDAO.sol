@@ -39,9 +39,9 @@ contract TreasuryDAO is ReentrancyGuard {
     address payable immutable payableOwner = payable(i_Owner);
 
 //constructor
-    constructor(address _teamAddress, address _DAOAddress){
+    constructor(address _teamAddress){
         i_Owner = _teamAddress;
-        i_DAOContract = _DAOAddress;
+        i_DAOContract = msg.sender;
     }
 
 //functions

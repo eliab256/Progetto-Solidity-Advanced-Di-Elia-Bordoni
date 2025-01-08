@@ -53,15 +53,10 @@ contract StakingTokenManager is ReentrancyGuard {
     mapping(address => bool) lockedStakedTokens;
 
 //constructor
-    constructor(
-        address _teamAddress, 
-        address _DaoAddress, 
-        address _tokenAddress,
-        uint256 _slashingPercent
-        ){
+    constructor(address _teamAddress, address _tokenAddress, uint256 _slashingPercent){
         i_tokenContract = IERC20(_tokenAddress);
         i_Owner = _teamAddress;
-        i_DAOContract = _DaoAddress;
+        i_DAOContract = msg.sender;
         i_slashingPercent = _slashingPercent;
     }
 
