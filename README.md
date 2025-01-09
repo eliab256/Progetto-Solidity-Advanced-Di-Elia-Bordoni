@@ -17,6 +17,10 @@ librerie da installare:
 - openzeppelin
 - chainlink/contracts
 
+librerie per test:
+
+- dotenv
+
 al momento del deploy i propietari inseriranno nome, simbolo, supply massima, supply da inviare al team e ai vecchi user al momento del deploy, supply da inviare agli utenti che interagiscono con il prootocollo entro un tot tempo e un array di indirizzi dei vecchi utenti. Il contratto invierà i token dove devono andare.
 
 test
