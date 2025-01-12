@@ -1,13 +1,15 @@
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { GovernanceToken } from "../typechain-types/contracts";
+import { Contract } from "ethers";
 
 interface ConstructorStruct {
   name: string;
   symbol: string;
-  teamAddress: number;
-  DAOAddress: number;
-  treasuryAddress: number;
+  teamAddress: string;
+  DAOAddress: string;
+  treasuryAddress: string;
   teamMintSupply: number;
   cap: number;
   olderUsersMintSupply: number;
@@ -21,9 +23,9 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
   return {
     name: "MooveToken",
     symbol: "MOV",
-    teamAddress: 0,
-    DAOAddress: 0,
-    treasuryAddress: 0,
+    teamAddress: "0x0000000000000000000000000000000000000000",
+    DAOAddress: "0x0000000000000000000000000000000000000000",
+    treasuryAddress: "0x0000000000000000000000000000000000000000",
     teamMintSupply: 1_000_000,
     cap: 5_000_000,
     olderUsersMintSupply: 500_000,
@@ -36,20 +38,33 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
 }
 
 describe("GovernanceToken", function () {
-  let governanceToken;
-  let owner;
-  let team;
+  let governanceToken: GovernanceToken & Contract;
+  let owner: SignerWithAddress;
+  let team: SignerWithAddress;
+  let DAO: SignerWithAddress;
+  let treasury: SignerWithAddress;
   let numberOfOlderUsers = 10; //process.env.NUMBER_OF_OLDER_USERS;
 
   beforeEach(async function () {
-    const [owner, team, ...users] = await ethers.getSigners();
+    const [owner, team, DAO, treasury, ...users] = await ethers.getSigners();
     const olderUsersAddresses = users.slice(0, { numberOfOlderUsers }).map((user: SignerWithAddress) => user.address);
-    //assegnare i vari address team e owner
-    const GovernanceToken = await ethers.getConractFactory("GovernanceToken");
 
-    const params = getDefaultParams(olderUsersAddresses);
+    const GovernanceToken = await ethers.getContractFactory("GovernanceToken");
 
-    governanceToken = await GovernanceToken.deploy(...Object.values(params));
+    const params = getDefaultParams({
+      teamAddress: team.address,
+      DAOAddress: DAO.address,
+      treasuryAddress: treasury.address,
+      olderUsersAddresses: olderUsersAddresses,
+    });
+
+    governanceToken = (await GovernanceToken.deploy(...Object.values(params))) as GovernanceToken & Contract;
     await governanceToken.deployed();
+  });
+
+  it("should deploy the contract with correct parameters", async function () {
+    expect(await governanceToken.name()).to.equal("MooveToken");
+    expect(await governanceToken.symbol()).to.equal("MOV");
+    expect(await governanceToken.cap()).to.equal(ethers.BigNumber.from(5_000_000));
   });
 });
