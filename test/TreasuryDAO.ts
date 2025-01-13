@@ -3,6 +3,7 @@ const { expect } = require("chai");
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { TreasuryDAO } from "../typechain-types/contracts";
 import { Contract } from "ethers";
+import { getLatestBlockTimestamp } from "../Utils/getTimeBlockStamp";
 
 interface TreasuryConstructorStruct {
   teamAddress: string;
@@ -21,11 +22,13 @@ describe("TreasuryDAO", function () {
   let treasuryDAO: TreasuryDAO & Contract;
   let team: SignerWithAddress;
   let DAO: SignerWithAddress;
+  let externalUser1: SignerWithAddress;
 
   beforeEach(async function () {
     const signers = await ethers.getSigners();
     team = signers[0];
     DAO = signers[1];
+    externalUser1 = signers[2];
 
     const TreasuryDAO = await ethers.getContractFactory("TreasuryDAO");
 
@@ -43,7 +46,7 @@ describe("TreasuryDAO", function () {
     expect(await treasuryDAO.DAOAddress()).to.equal(DAO.address);
   });
 
-  it("should return the correct initial balance of the contract", async function () {
+  it("should return the correct  balance of the contract", async function () {
     const balance = await treasuryDAO.getBalance();
     expect(balance).to.equal(0);
     console.log("Initial Balance: ", balance.toString());
@@ -56,5 +59,34 @@ describe("TreasuryDAO", function () {
 
     expect(await treasuryDAO.getBalance()).to.equal(amountToSend);
     console.log("Finale balance: ", ethers.utils.formatEther(balance), "is equal to amount sent:", ethers.utils.formatEther(amountToSend));
+  });
+
+  it("should receive funds from DAO contract only", async function () {
+    const initialBalance = await treasuryDAO.getBalance();
+
+    const amountSentFromANonDAOAddress = ethers.utils.parseEther("1.0");
+    await expect(
+      externalUser1.sendTransaction({
+        to: treasuryDAO,
+        value: amountSentFromANonDAOAddress,
+      })
+    )
+      .to.emit(treasuryDAO, "ReceiveTriggered")
+      .withArgs(externalUser1.address, amountSentFromANonDAOAddress, await getLatestBlockTimestamp())
+      .and.to.be.revertedWith(`TreasuryDAO__SendETHToGovernanceContractToBuyTokens(${DAO.address})`);
+    expect(await treasuryDAO.getBalance()).to.equal(initialBalance);
+
+    const amountSentFromDAO = ethers.utils.parseEther("1.0");
+    await expect(
+      DAO.sendTransaction({
+        to: treasuryDAO,
+        value: amountSentFromDAO,
+      })
+    )
+      .to.emit(treasuryDAO, "ReceiveTriggered")
+      .withArgs(DAO.address, amountSentFromDAO, await getLatestBlockTimestamp())
+      .and.to.emit(treasuryDAO, "Deposit")
+      .withArgs(DAO.address, amountSentFromDAO, await getLatestBlockTimestamp());
+    expect(await treasuryDAO.getBalance()).to.equal(amountSentFromDAO);
   });
 });
