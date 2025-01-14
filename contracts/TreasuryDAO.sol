@@ -13,6 +13,7 @@ contract TreasuryDAO is ReentrancyGuard {
     error TreasuryDAO__NotDAO();
     error TreasuryDAO__InvalidInputValue();
     error TreasuryDAO__TryingToWithdrawMoreETHThenBalance(uint256 _amountWithdraw, uint256 _contractBalance);
+    error TreasuryDAO__NothingToWithdraw();
 
 //events
     event Deposit(address indexed from, uint256 amount, uint256 timestamp);
@@ -60,6 +61,7 @@ contract TreasuryDAO is ReentrancyGuard {
     }
 
     function emergencyWithdraw() external onlyOwner {
+        if(address(this).balance = 0){revert TreasuryDAO__NothingToWithdraw();}
         payableOwner.transfer(address(this).balance);
         emit EmergencyWithdraw(address(this).balance, block.timestamp);
     }

@@ -61,6 +61,54 @@ describe("TreasuryDAO", function () {
     console.log("Finale balance: ", ethers.utils.formatEther(balance), "is equal to amount sent:", ethers.utils.formatEther(amountToSend));
   });
 
+  it("should allow the DAO to withdraw funds successfully", async function () {
+    const chargeBalanceContract = ethers.utils.parseEther("5.0");
+    await DAO.sendTransaction({
+      to: treasuryDAO,
+      value: chargeBalanceContract,
+    });
+
+    const contractInitialBalance = await treasuryDAO.getBalance();
+    const DAOInitialBalance = await ethers.provider.getBalance(DAO.address);
+    const extUser1InitialBalance = await ethers.provider.getBalance(externalUser1.address);
+    const amountToWithdraw = ethers.utils.parseEther("1.0");
+
+    const tx = await treasuryDAO.connect(DAO).withdraw(amountToWithdraw, externalUser1.address);
+    const receipt = await tx.wait();
+  });
+
+  it("only owner should be able to do an emergency widthraw", async function () {
+    const initialFunding = ethers.utils.parseEther("5.0");
+
+    await DAO.sendTransaction({
+      to: treasuryDAO,
+      value: initialFunding,
+    });
+
+    const initialContractBalance = await ethers.provider.getBalance();
+    expect(initialContractBalance).to.equal(initialFunding);
+
+    await expect(treasuryDAO.connect(externalUser1).emergencyWithdraw()).to.be.revertedWithCustomError(treasuryDAO, "TreasuryDAO__OnlyOwner");
+
+    const teamInitialBalance = await ethers.provider.getBalance(team.address);
+    const tx = await treasuryDAO.connect(team).emergencyWithdraw();
+    const receipt = await tx.wait();
+
+    const finalContractBalance = await ethers.provider.getBalance();
+    expect(finalContractBalance).to.equal(0);
+    if (!receipt) throw new Error("Transaction receipt is null");
+
+    const teamFinalBalance = await ethers.provider.getBalance(team.address);
+    expect(teamFinalBalance).to.be.gt(teamInitialBalance);
+
+    await expect(tx)
+      .to.emit(treasuryDAO, "EmergencyWithdraw")
+      .withArgs(initialFunding, await getLatestBlockTimestamp());
+
+    console.log("Initial state Team Balance:", teamInitialBalance.toString(), "contract Balance:", initialContractBalance.toString());
+    console.log("Final state Team Balance:", teamFinalBalance.toString(), "Team Balance:", finalContractBalance.toString());
+  });
+
   it("should receive funds from DAO contract only", async function () {
     const initialBalance = await treasuryDAO.getBalance();
 
@@ -88,5 +136,21 @@ describe("TreasuryDAO", function () {
       .and.to.emit(treasuryDAO, "Deposit")
       .withArgs(DAO.address, amountSentFromDAO, await getLatestBlockTimestamp());
     expect(await treasuryDAO.getBalance()).to.equal(amountSentFromDAO);
+  });
+
+  it("fallback should revert and emit an event", async function () {
+    const amountToSend = ethers.utils.parseEther("0.5");
+    const randomData = ethers.utils.hexlify(ethers.utils.randomBytes(10));
+    await expect(
+      externalUser1.sendTransaction({
+        to: treasuryDAO,
+        value: amountToSend,
+        data: randomData,
+      })
+    )
+      .to.emit(treasuryDAO, "FallbackTriggered")
+      .withArgs(externalUser1, amountToSend, randomData, await getLatestBlockTimestamp())
+      .and.to.be.revertedWith(`TreasuryDAO__UseGovernanceContractToInteractWithTheDAO(${DAO.address})`);
+    expect(await treasuryDAO.getBalance()).to.equal(0);
   });
 });
