@@ -61,7 +61,7 @@ contract TreasuryDAO is ReentrancyGuard {
     }
 
     function emergencyWithdraw() external onlyOwner {
-        if(address(this).balance = 0){revert TreasuryDAO__NothingToWithdraw();}
+        if(address(this).balance == 0){revert TreasuryDAO__NothingToWithdraw();}
         payableOwner.transfer(address(this).balance);
         emit EmergencyWithdraw(address(this).balance, block.timestamp);
     }
