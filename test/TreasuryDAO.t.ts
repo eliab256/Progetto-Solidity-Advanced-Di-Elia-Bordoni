@@ -12,7 +12,7 @@ interface TreasuryConstructorStruct {
 
 function getDefaultParams(overrides: Partial<TreasuryConstructorStruct> = {}): TreasuryConstructorStruct {
   return {
-    teamAddress: "0x0000000000000000000000000000000000000000",
+    teamAddress: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", //account
     DAOAddress: "0x0000000000000000000000000000000000000000",
     ...overrides,
   };
@@ -25,7 +25,7 @@ describe("TreasuryDAO", function () {
   let externalUser1: SignerWithAddress;
 
   beforeEach(async function () {
-    const signers = await ethers.getSigners();
+    const signers: SignerWithAddress[] = await ethers.getSigners();
     team = signers[0];
     DAO = signers[1];
     externalUser1 = signers[2];
