@@ -16,6 +16,7 @@ contract TreasuryDAO is ReentrancyGuard {
     error TreasuryDAO__NothingToWithdraw();
 
 //events
+    event TeasuryDAOContractDeployedCorrectly(address teamAddress, address daoAddress);
     event Deposit(address indexed from, uint256 amount, uint256 timestamp);
     event FailedWithdraw(address indexed recipient, uint256 amount, uint256 timestamp);
     event SuccesfulTWithdraw(address indexed recipient, uint256 amount, uint256 timestamp);
@@ -43,6 +44,7 @@ contract TreasuryDAO is ReentrancyGuard {
     constructor(address _teamAddress){
         i_Owner = _teamAddress;
         i_DAOContract = msg.sender;
+        emit TeasuryDAOContractDeployedCorrectly(_teamAddress, msg.sender);
     }
 
 //functions

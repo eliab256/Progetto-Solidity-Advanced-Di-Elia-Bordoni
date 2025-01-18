@@ -21,6 +21,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     error GovernanceToken__UseGovernanceContractToInteractWithTheDAO(address _governanceContractAddress);
 
 //events
+    event GovernanceTokenContractDeployedCorrectly(address teamAddress, address treasuryAddress, address daoAddress, uint256 tokenPrice, uint256 cap);
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
     event Claimed (address indexed claimant, uint256 amount, uint256 timestamp);
     event ReceiveTriggered(address sender, uint256 amount, uint256 timestamp);
@@ -87,7 +88,6 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         string name;
         string symbol;
         address teamAddress;
-        address DAOAddress;
         address treasuryAddress;
         uint256 teamMintSupply;
         uint256 cap;
@@ -112,7 +112,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         }
 
         i_Owner = params.teamAddress;
-        i_DAOContract = params.DAOAddress;
+        i_DAOContract = msg.sender;
         i_treasuryContract = params.treasuryAddress;
         i_cap = params.cap;
         tokenPrice = params.tokenPrice;
@@ -149,6 +149,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         _transfer(address(this), i_DAOContract, balanceOf(address(this)) - i_earlyAdopterMintSupply * 10 ** decimals());
 
         emit TokenMinting(totalSupply(), i_deployTimeStamp);
+        emit GovernanceTokenContractDeployedCorrectly(params.teamAddress, params.treasuryAddress, msg.sender, params.tokenPrice, params.cap);
     }
 
 

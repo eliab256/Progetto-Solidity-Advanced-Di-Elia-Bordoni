@@ -63,8 +63,7 @@ contract GovernanceDAO is ReentrancyGuard{
     
 //event
     //contructor events
-    event MooveTokenCreated(address tokenAddress, string name, string symbol, address owner, uint256 totalSupply, uint256 tokenPrice);
-    event MooveTreasuryCreated(address treasuryAddress, address owner, address dao); 
+    event GovernanceDAOContractDeployedCorrectly (address teamAddress, address daoAddress, address tokenAddress, address treasuryAddress, address stakingManagerAddress);
     //proposal events
     event ProposalCreated(address indexed proposer, uint256 indexed proposalIndex, string proposalDescription, uint256 creationTime, uint256 closeVotationTime);
     event ProposalRefused(uint256 indexed proposalIndex, uint256 totalVotes, uint256 abstainVotes, address indexed proposer);
@@ -196,7 +195,6 @@ contract GovernanceDAO is ReentrancyGuard{
             name: params.name,
             symbol: params.symbol,
             teamAddress: msg.sender,
-            DAOAddress: address(this),
             treasuryAddress: address(MooveTreasury),
             teamMintSupply: params.teamMintSupply,
             cap: params.cap,
@@ -220,10 +218,8 @@ contract GovernanceDAO is ReentrancyGuard{
         proposalQuorumPercent = params.proposalQuorumPercent;
         daysofVoting = params.votingPeriodInDays * 86400;
 
-        emit MooveTokenCreated(i_tokenContract, params.name, params.symbol, msg.sender, params.cap, params.tokenPrice);
-        emit MooveTreasuryCreated(i_treasuryContract, msg.sender, address(this));
         emit NewTokenPriceSet(params.tokenPrice, block.timestamp);
-
+        emit GovernanceDAOContractDeployedCorrectly (msg.sender, address(this), i_tokenContract, i_treasuryContract, i_stakingContract);
     }
 
 //functions

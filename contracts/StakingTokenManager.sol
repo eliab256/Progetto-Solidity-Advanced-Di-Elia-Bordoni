@@ -23,6 +23,7 @@ contract StakingTokenManager is ReentrancyGuard {
     error StakingTokenManager__UseGovernanceContractToInteractWithTheDAO(address _DAOAddress);
 
 //events
+    event StakingTokenManagerContractDeployedCorrectly(address teamAddress, address tokenAddress, address daoAddress, uint256 slashingPercent);
     event TokensStaked(address indexed user, uint256 amount, uint256 timestamp);
     event TokensUnstaked(address indexed user, uint256 amount, uint256 timestamp);
     event TokenSlashed(address indexed user, uint256 amount, uint256 timestamp);
@@ -58,6 +59,7 @@ contract StakingTokenManager is ReentrancyGuard {
         i_Owner = _teamAddress;
         i_DAOContract = msg.sender;
         i_slashingPercent = _slashingPercent;
+        emit StakingTokenManagerContractDeployedCorrectly(_teamAddress, _tokenAddress, msg.sender, _slashingPercent);
     }
 
 //functions
