@@ -17,6 +17,8 @@ const defaultParams = {
   VotingPeriodInDays: 0,
 };
 
+const ONE_ETH: bigint = 1_000_000_000_000_000_000n;
+
 const GovernanceDAOModule = buildModule("GovernanceDAOModule", (m) => {
   const name = m.getParameter("Name", defaultParams.Name);
   const symbol = m.getParameter("Symbol", defaultParams.Symbol);
@@ -36,22 +38,30 @@ const GovernanceDAOModule = buildModule("GovernanceDAOModule", (m) => {
   const slashingPercent = m.getParameter("SlashingPercent", defaultParams.SlashingPercent);
   const votingPeriodInDays = m.getParameter("VotingPeriodInDays", defaultParams.VotingPeriodInDays);
 
-  const governanceDAO = m.contract("GovernanceDAO", [
-    name,
-    symbol,
-    teamMintSupply,
-    cap,
-    olderUsersMintSupply,
-    earlyAdopterMintSupply,
-    olderUsersAddresses,
-    weeksOfVesting,
-    tokenPrice,
-    minimumTokenStakedToMakeAProposal,
-    minimumCirculatingSupplyToMakeAProposalInPercent,
-    proposalQuorumPercent,
-    slashingPercent,
-    votingPeriodInDays,
-  ]);
+  const initialBalance = m.getParameter("InitialBalance", ONE_ETH);
+
+  const governanceDAO = m.contract(
+    "GovernanceDAO",
+    [
+      name,
+      symbol,
+      teamMintSupply,
+      cap,
+      olderUsersMintSupply,
+      earlyAdopterMintSupply,
+      olderUsersAddresses,
+      weeksOfVesting,
+      tokenPrice,
+      minimumTokenStakedToMakeAProposal,
+      minimumCirculatingSupplyToMakeAProposalInPercent,
+      proposalQuorumPercent,
+      slashingPercent,
+      votingPeriodInDays,
+    ],
+    {
+      value: initialBalance,
+    }
+  );
 
   return { governanceDAO };
 });
