@@ -1,10 +1,9 @@
-const { ethers, deployments } = require("hardhat");
+const { ethers } = require("hardhat");
 const { expect } = require("chai");
+import { Contract } from "ethers";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { TreasuryDAO } from "../typechain-types/contracts";
-import { Contract } from "ethers";
 import { getLatestBlockTimestamp } from "../Utils/getTimeBlockStamp";
-import TreasuryDAOModule from "../Ignition/modules/IgnitionTreasuryDAO";
 
 describe("TreasuryDAO", function () {
   let treasuryDAO: TreasuryDAO & Contract;
@@ -19,10 +18,16 @@ describe("TreasuryDAO", function () {
     externalUser1 = signers[2];
 
     treasuryDAO = await ethers.deployContract("TreasuryDAO", [team.address]);
+
+    //const TreasuryDAO = await ethers.getContractFactory("TreasuryDAO", [team.address]);
+    //treasuryDAO = await TreasuryDAO.deploy();
+    await treasuryDAO.deployed();
   });
 
   it("should deploy TreasuryDAO correctly", async function () {
-    expect(await treasuryDAO.teamAddress()).to.equal(team.address);
+    await expect(treasuryDAO)
+      .to.emit(treasuryDAO, "TeasuryDAOContractDeployedCorrectly")
+      .withArgs(team.address, DAO.address);
   });
 
   it("should return the correct  balance of the contract", async function () {
@@ -37,7 +42,12 @@ describe("TreasuryDAO", function () {
     });
 
     expect(await treasuryDAO.getBalance()).to.equal(amountToSend);
-    console.log("Finale balance: ", ethers.utils.formatEther(balance), "is equal to amount sent:", ethers.utils.formatEther(amountToSend));
+    console.log(
+      "Finale balance: ",
+      ethers.utils.formatEther(balance),
+      "is equal to amount sent:",
+      ethers.utils.formatEther(amountToSend)
+    );
   });
 
   it("should allow the DAO to withdraw funds successfully", async function () {
@@ -67,7 +77,10 @@ describe("TreasuryDAO", function () {
     const initialContractBalance = await ethers.provider.getBalance();
     expect(initialContractBalance).to.equal(initialFunding);
 
-    await expect(treasuryDAO.connect(externalUser1).emergencyWithdraw()).to.be.revertedWithCustomError(treasuryDAO, "TreasuryDAO__OnlyOwner");
+    await expect(treasuryDAO.connect(externalUser1).emergencyWithdraw()).to.be.revertedWithCustomError(
+      treasuryDAO,
+      "TreasuryDAO__OnlyOwner"
+    );
 
     const teamInitialBalance = await ethers.provider.getBalance(team.address);
     const tx = await treasuryDAO.connect(team).emergencyWithdraw();
@@ -84,8 +97,18 @@ describe("TreasuryDAO", function () {
       .to.emit(treasuryDAO, "EmergencyWithdraw")
       .withArgs(initialFunding, await getLatestBlockTimestamp());
 
-    console.log("Initial state Team Balance:", teamInitialBalance.toString(), "contract Balance:", initialContractBalance.toString());
-    console.log("Final state Team Balance:", teamFinalBalance.toString(), "Team Balance:", finalContractBalance.toString());
+    console.log(
+      "Initial state Team Balance:",
+      teamInitialBalance.toString(),
+      "contract Balance:",
+      initialContractBalance.toString()
+    );
+    console.log(
+      "Final state Team Balance:",
+      teamFinalBalance.toString(),
+      "Team Balance:",
+      finalContractBalance.toString()
+    );
   });
 
   it("should receive funds from DAO contract only", async function () {
