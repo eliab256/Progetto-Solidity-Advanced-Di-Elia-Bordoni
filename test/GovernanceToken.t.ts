@@ -8,7 +8,6 @@ interface ConstructorStruct {
   name: string;
   symbol: string;
   teamAddress: string;
-  DAOAddress: string;
   treasuryAddress: string;
   teamMintSupply: number;
   cap: number;
@@ -24,7 +23,6 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
     name: "MooveToken",
     symbol: "MOV",
     teamAddress: "0x0000000000000000000000000000000000000000",
-    DAOAddress: "0x0000000000000000000000000000000000000000",
     treasuryAddress: "0x0000000000000000000000000000000000000000",
     teamMintSupply: 1_000_000,
     cap: 5_000_000,
@@ -46,14 +44,13 @@ describe("GovernanceToken", function () {
   let numberOfOlderUsers = 10; //process.env.NUMBER_OF_OLDER_USERS;
 
   beforeEach(async function () {
-    const [owner, team, DAO, treasury, ...users] = await ethers.getSigners();
+    const [DAO, team, treasury, ...users] = await ethers.getSigners();
     const olderUsersAddresses = users.slice(0, { numberOfOlderUsers }).map((user: SignerWithAddress) => user.address);
 
     const GovernanceToken = await ethers.getContractFactory("GovernanceToken");
 
     const params = getDefaultParams({
       teamAddress: team.address,
-      DAOAddress: DAO.address,
       treasuryAddress: treasury.address,
       olderUsersAddresses: olderUsersAddresses,
     });
