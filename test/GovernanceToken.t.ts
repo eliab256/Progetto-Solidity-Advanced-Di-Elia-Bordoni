@@ -18,23 +18,6 @@ interface ConstructorStruct {
   tokenPrice: number;
 }
 
-function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): ConstructorStruct {
-  return {
-    name: "MooveToken",
-    symbol: "MOV",
-    teamAddress: "0x0000000000000000000000000000000000000000",
-    treasuryAddress: "0x0000000000000000000000000000000000000000",
-    teamMintSupply: 1_000_000,
-    cap: 5_000_000,
-    olderUsersMintSupply: 500_000,
-    earlyAdopterMintSupply: 500_000,
-    olderUsersAddresses: [],
-    weeksOfVesting: 4,
-    tokenPrice: ethers.utils.parseEther("0.001"),
-    ...overrides,
-  };
-}
-
 describe("GovernanceToken", function () {
   let governanceToken: GovernanceToken & Contract;
   let owner: SignerWithAddress;
@@ -49,13 +32,34 @@ describe("GovernanceToken", function () {
 
     const GovernanceToken = await ethers.getContractFactory("GovernanceToken");
 
-    const params = getDefaultParams({
+    const params: ConstructorStruct = {
+      name: "MooveToken",
+      symbol: "MOV",
       teamAddress: team.address,
       treasuryAddress: treasury.address,
+      teamMintSupply: 1_000_000,
+      cap: 5_000_000,
+      olderUsersMintSupply: 500_000,
+      earlyAdopterMintSupply: 500_000,
       olderUsersAddresses: olderUsersAddresses,
-    });
+      weeksOfVesting: 4,
+      tokenPrice: ethers.utils.parseEther("0.001"),
+    };
 
-    governanceToken = (await GovernanceToken.deploy(...Object.values(params))) as GovernanceToken & Contract;
+    governanceToken = (await GovernanceToken.deploy(
+      params.name,
+      params.symbol,
+      params.teamAddress,
+      params.treasuryAddress,
+      params.teamMintSupply,
+      params.cap,
+      params.olderUsersMintSupply,
+      params.earlyAdopterMintSupply,
+      params.olderUsersAddresses,
+      params.weeksOfVesting,
+      params.tokenPrice
+    )) as GovernanceToken & Contract;
+
     await governanceToken.deployed();
   });
 
