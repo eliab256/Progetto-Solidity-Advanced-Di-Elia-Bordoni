@@ -146,7 +146,7 @@ contract GovernanceDAO is ReentrancyGuard{
     address immutable i_treasuryContract;
     address immutable i_stakingContract; 
 
-    uint256 public tokenPrice = MooveToken.getPrice() * 10 ** MooveToken.decimals();
+    uint256 public tokenPrice = getPrice() * 10 ** MooveToken.decimals();
     bool public isTradingAllowed;
 
     uint256 public daysofVoting;
@@ -201,8 +201,7 @@ contract GovernanceDAO is ReentrancyGuard{
             olderUsersMintSupply: params.olderUsersMintSupply,
             earlyAdopterMintSupply: params.earlyAdopterMintSupply,
             olderUsersAddresses: params.olderUsersAddresses,
-            weeksOfVesting: params.weeksOfVesting,
-            tokenPrice: params.tokenPrice
+            weeksOfVesting: params.weeksOfVesting
         });
 
         MooveToken = new GovernanceToken(tokenParams);
@@ -515,6 +514,10 @@ contract GovernanceDAO is ReentrancyGuard{
 
     function getEthBalance() public view returns(uint256){
         return address(this).balance;
+    }
+
+    function getPrice() public view returns (uint256){
+        return tokenPrice;
     }
 
     function getConversionRate(uint256 _ethAmount) private view returns(uint256){

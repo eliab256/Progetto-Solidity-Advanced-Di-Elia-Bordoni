@@ -45,7 +45,7 @@ describe("GovernanceToken", function () {
 
   beforeEach(async function () {
     const [DAO, team, treasury, ...users] = await ethers.getSigners();
-    const olderUsersAddresses = users.slice(0, { numberOfOlderUsers }).map((user: SignerWithAddress) => user.address);
+    const olderUsersAddresses = users.slice(0, numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
 
     const GovernanceToken = await ethers.getContractFactory("GovernanceToken");
 
