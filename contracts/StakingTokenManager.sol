@@ -46,9 +46,9 @@ contract StakingTokenManager is ReentrancyGuard {
 
 //variables and mapping
     IERC20 public immutable i_tokenContract;
-    address immutable i_Owner;
-    address immutable i_DAOContract;
-    uint256 immutable i_slashingPercent;
+    address immutable public i_Owner;
+    address immutable public i_DAOContract;
+    uint256 immutable public i_slashingPercent;
 
     mapping(address => uint256) stakingBalances;
     mapping(address => bool) lockedStakedTokens;

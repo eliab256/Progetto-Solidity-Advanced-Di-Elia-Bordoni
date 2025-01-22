@@ -168,7 +168,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         return remaningTime / 86400;
     }
 
-    function updateElegibleAdresses(address _buyerAddress) external onlyDAO activeVestingPeriod {
+    function updateElegibleAdresses(address _buyerAddress) external onlyOwner activeVestingPeriod {
         for(uint256 i=0; i < index; i++){
             if(elegibleForClaims[i] == _buyerAddress) {
                 revert("Address already registered");
@@ -207,7 +207,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         _transfer(address(this),msg.sender,claimsAmountForAddress[msg.sender]);
     }
 
-    function sendingToken(address _daoAddress, address _addressFunder, uint256 _amount) public onlyDAO {
+    function sendingToken(address _daoAddress, address _addressFunder, uint256 _amount) public onlyDAO{
         _transfer(_daoAddress,_addressFunder,_amount);
     }
 

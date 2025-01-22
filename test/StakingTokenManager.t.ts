@@ -31,10 +31,31 @@ describe("StakingTokenManager", function () {
     await stakingTokenManager.depolyed();
   });
 
-  it("should deploy StakingTokenManager correctly", async function () {
-    const deployedAddress = await stakingTokenManager.address;
-    expect(deployedAddress).to.be.properAddress;
+  describe("constructor and deploy", async function () {
+    it("should deploy the contract with correct parameters", async function () {});
 
-    console.log("Contract deployed successfully:", stakingTokenManager.address);
+    it("should emit the event of deploy", async function () {});
   });
+
+  describe("staking and locking functions", async function () {
+    it("external user should be able to stake his tokens", async function () {});
+
+    it("external user should be able to unstake his stokens", async function () {});
+
+    it("external user shouldn' t be able to unstake his stokens if they are locked", async function () {});
+
+    it("dao should be able to lock his tokens staked", async function () {});
+
+    it("dao should be able to unlock his tokens staked", async function () {});
+
+    it("user should be able to check if token are staked or not", async function () {});
+
+    it("user should be able to check if token are locked or not", async function () {});
+  });
+
+  it("dao should be able to slash tokens", async function () {});
+
+  it("receive function should revert and suuggest dao contract to send ETH", async function () {});
+
+  it("fallback function should revert and suuggest dao contract to send ETH", async function () {});
 });

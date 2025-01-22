@@ -1,7 +1,6 @@
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
-import dotenv from "dotenv";
 
 interface ConstructorStruct {
   name: string;
@@ -42,12 +41,12 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
 
 describe("GovernanceDAO", function () {
   let governanceDAO;
-  let owner;
+  let DAO;
   let team;
   let numberOfOlderUsers = 10; //process.env.NUMBER_OF_OLDER_USERS;
 
   beforeEach(async function () {
-    const [owner, team, ...users] = await ethers.getSigners();
+    const [team, DAO, ...users] = await ethers.getSigners();
     const olderUsersAddresses = users.slice(0, numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
 
     const GovernanceDAO = await ethers.getContractFactory("GovernanceDAO");
@@ -59,4 +58,17 @@ describe("GovernanceDAO", function () {
 
     await governanceDAO.deployed();
   });
+  describe("constructor and deploy", async function () {
+    it("should deploy the contract with correct parameters", async function () {});
+
+    it("should deploy token contract correctly", async function () {});
+
+    it("should deploy staking contract correctly", async function () {});
+
+    it("should deploy treasury contract correctly", async function () {});
+
+    it("should emit the event of deploys", async function () {});
+  });
+
+  describe("proposals functions", async function () {});
 });

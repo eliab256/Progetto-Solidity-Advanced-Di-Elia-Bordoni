@@ -141,10 +141,10 @@ contract GovernanceDAO is ReentrancyGuard{
     mapping (address => address[]) public delegateeToDelegators;
     address[] public delegatees; 
 
-    address immutable i_Owner;
-    address immutable i_tokenContract;
-    address immutable i_treasuryContract;
-    address immutable i_stakingContract; 
+    address immutable public i_Owner;
+    address immutable public i_tokenContract;
+    address immutable public i_treasuryContract;
+    address immutable public i_stakingContract; 
 
     uint256 public tokenPrice = getPrice() * 10 ** MooveToken.decimals();
     bool public isTradingAllowed;

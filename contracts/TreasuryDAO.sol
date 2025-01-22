@@ -36,8 +36,8 @@ contract TreasuryDAO is ReentrancyGuard {
     }
 
 //variables and mappings
-    address immutable i_Owner;
-    address immutable i_DAOContract;
+    address immutable public i_Owner;
+    address immutable public i_DAOContract;
     address payable immutable payableOwner = payable(i_Owner);
 
 //constructor
