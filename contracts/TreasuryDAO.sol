@@ -14,6 +14,7 @@ contract TreasuryDAO is ReentrancyGuard {
     error TreasuryDAO__InvalidInputValue();
     error TreasuryDAO__TryingToWithdrawMoreETHThenBalance(uint256 _amountWithdraw, uint256 _contractBalance);
     error TreasuryDAO__NothingToWithdraw();
+    error TreasuryDAO__TransferFailed();
 
 //events
     event TeasuryDAOContractDeployedCorrectly(address teamAddress, address daoAddress);
@@ -38,10 +39,11 @@ contract TreasuryDAO is ReentrancyGuard {
 //variables and mappings
     address immutable public i_Owner;
     address immutable public i_DAOContract;
-    address payable immutable payableOwner = payable(i_Owner);
+    address payable immutable public payableOwner = payable(i_Owner);
 
 //constructor
     constructor(address _teamAddress){
+        if(_teamAddress == 0x0000000000000000000000000000000000000000){revert TreasuryDAO__InvalidInputValue();}
         i_Owner = _teamAddress;
         i_DAOContract = msg.sender;
         emit TeasuryDAOContractDeployedCorrectly(_teamAddress, msg.sender);
@@ -59,13 +61,17 @@ contract TreasuryDAO is ReentrancyGuard {
         bool sendSuccess = payable(_recipient).send(_amount);
         if (!sendSuccess) {
             emit FailedWithdraw(_recipient, _amount, block.timestamp);
+            revert TreasuryDAO__TransferFailed();
         } else emit SuccesfulTWithdraw(_recipient, _amount, block.timestamp);
     }
 
     function emergencyWithdraw() external onlyOwner {
         if(address(this).balance == 0){revert TreasuryDAO__NothingToWithdraw();}
-        payableOwner.transfer(address(this).balance);
-        emit EmergencyWithdraw(address(this).balance, block.timestamp);
+        (bool success,) = payableOwner.call{value: address(this).balance}("");
+        if (!success) {
+            emit FailedWithdraw(payableOwner, address(this).balance, block.timestamp);
+        revert TreasuryDAO__TransferFailed();
+        } else emit EmergencyWithdraw(address(this).balance, block.timestamp);
     }
 
     receive() external payable{
