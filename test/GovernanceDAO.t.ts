@@ -5,15 +5,15 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 interface ConstructorStruct {
   name: string;
   symbol: string;
-  teamMintSupply: number;
-  cap: number;
-  olderUsersMintSupply: number;
-  earlyAdopterMintSupply: number;
+  teamMintSupply: bigint;
+  cap: bigint;
+  olderUsersMintSupply: bigint;
+  earlyAdopterMintSupply: bigint;
   olderUsersAddresses: string[];
   weeksOfVesting: number;
   tokenPrice: number;
-  minimumTokenStakedToMakeAProposal: number;
-  minimumCirculatingSupplyToMakeAProposalInPercent: number;
+  minimumTokenStakedToMakeAProposal: bigint;
+  minimumCirculatingSupplyToMakeAProposalInPercent: bigint;
   proposalQuorumPercent: number;
   slashingPercent: number;
   votingPeriodInDays: number;
@@ -23,15 +23,15 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
   return {
     name: "MooveToken",
     symbol: "MOV",
-    teamMintSupply: 1_000_000,
-    cap: 5_000_000,
-    olderUsersMintSupply: 500_000,
-    earlyAdopterMintSupply: 500_000,
+    teamMintSupply: 2_000_000n,
+    cap: 5_000_000n,
+    olderUsersMintSupply: 500_000n,
+    earlyAdopterMintSupply: 500_000n,
     olderUsersAddresses: [],
     weeksOfVesting: 4,
     tokenPrice: ethers.utils.parseEther("0.001"),
-    minimumTokenStakedToMakeAProposal: 50,
-    minimumCirculatingSupplyToMakeAProposalInPercent: 3_500_000,
+    minimumTokenStakedToMakeAProposal: 50n,
+    minimumCirculatingSupplyToMakeAProposalInPercent: 3_500_000n,
     proposalQuorumPercent: 20,
     slashingPercent: 10,
     votingPeriodInDays: 14,
@@ -43,11 +43,17 @@ describe("GovernanceDAO", function () {
   let governanceDAO;
   let DAO;
   let team;
-  let numberOfOlderUsers = 10; //process.env.NUMBER_OF_OLDER_USERS;
+  let externalUser1;
+  let externalUser2;
+  let numberOfOlderUsers = 10;
 
   beforeEach(async function () {
-    const [team, DAO, ...users] = await ethers.getSigners();
-    const olderUsersAddresses = users.slice(0, numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
+    const signers: SignerWithAddress[] = await ethers.getSigners();
+    DAO = signers[0];
+    team = signers[1];
+    externalUser1 = signers[2];
+    externalUser2 = signers[3];
+    const olderUsersAddresses = signers.slice(4, 4 + numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
 
     const GovernanceDAO = await ethers.getContractFactory("GovernanceDAO");
 

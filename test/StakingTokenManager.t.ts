@@ -5,30 +5,47 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { StakingTokenManager } from "../typechain-types/contracts";
 import { GovernanceToken } from "../typechain-types/contracts";
 
+interface ConstructorTokenStruct {
+  name: string;
+  symbol: string;
+  teamAddress: string;
+  treasuryAddress: string;
+  teamMintSupply: bigint;
+  cap: bigint;
+  olderUsersMintSupply: bigint;
+  earlyAdopterMintSupply: bigint;
+  olderUsersAddresses: string[];
+  weeksOfVesting: number;
+}
+
 describe("StakingTokenManager", function () {
   let stakingTokenManager: StakingTokenManager & Contract;
   let team: SignerWithAddress;
   let DAO: SignerWithAddress;
-  let token: GovernanceToken;
+  let tokenContract: GovernanceToken;
   let externalUser1: SignerWithAddress;
   let externalUser2: SignerWithAddress;
+  let olderUsersAddresses: string[];
   let slashingPercent: number;
+  let numberOfOlderUsers: number;
 
-  this.beforeEach(async function () {
+  beforeEach(async function () {
     const signers: SignerWithAddress[] = await ethers.getSigners();
     DAO = signers[0];
     team = signers[1];
-    //token = signers[2];
-    externalUser1 = signers[3];
+    externalUser1 = signers[2];
     externalUser2 = signers[3];
+    numberOfOlderUsers = 10;
+    olderUsersAddresses = signers.slice(4, 4 + numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
+
     slashingPercent = 50;
 
     stakingTokenManager = await ethers.deployContract("StakingTokenManager", [
       team.address,
-      //token.address,
+      //tokenContract.target,
       slashingPercent,
     ]);
-    await stakingTokenManager.depolyed();
+    await stakingTokenManager.waitForDeployment();
   });
 
   describe("constructor and deploy", async function () {

@@ -4,50 +4,56 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { GovernanceToken } from "../typechain-types/contracts";
 import { Contract } from "ethers";
 
-interface ConstructorStruct {
+interface ConstructorTokenStruct {
   name: string;
   symbol: string;
   teamAddress: string;
   treasuryAddress: string;
-  teamMintSupply: number;
-  cap: number;
-  olderUsersMintSupply: number;
-  earlyAdopterMintSupply: number;
+  teamMintSupply: bigint;
+  cap: bigint;
+  olderUsersMintSupply: bigint;
+  earlyAdopterMintSupply: bigint;
   olderUsersAddresses: string[];
   weeksOfVesting: number;
-  tokenPrice: number;
+}
+
+function getEtherValue(value: number): bigint {
+  return ethers.parseEther(`${value.toString()}`);
 }
 
 describe("GovernanceToken", function () {
   let governanceToken: GovernanceToken & Contract;
-  let owner: SignerWithAddress;
   let team: SignerWithAddress;
   let DAO: SignerWithAddress;
   let treasury: SignerWithAddress;
-  let numberOfOlderUsers = 10; //process.env.NUMBER_OF_OLDER_USERS;
+  let numberOfOlderUsers: number;
+  let olderUsersAddresses: string[];
 
   beforeEach(async function () {
-    const [DAO, team, treasury, ...users] = await ethers.getSigners();
-    const olderUsersAddresses = users.slice(0, numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
+    const signers: SignerWithAddress[] = await ethers.getSigners();
+    DAO = signers[0];
+    team = signers[1];
+    treasury = signers[2];
+    numberOfOlderUsers = 10;
+    olderUsersAddresses = signers.slice(3, 3 + numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
 
     const GovernanceToken = await ethers.getContractFactory("GovernanceToken");
 
-    const params: ConstructorStruct = {
+    const params: ConstructorTokenStruct = {
       name: "MooveToken",
       symbol: "MOV",
       teamAddress: team.address,
       treasuryAddress: treasury.address,
-      teamMintSupply: 1_000_000,
-      cap: 5_000_000,
-      olderUsersMintSupply: 500_000,
-      earlyAdopterMintSupply: 500_000,
+      teamMintSupply: 4_000_000n,
+      cap: 10_000_000n,
+      olderUsersMintSupply: 1_000_000n,
+      earlyAdopterMintSupply: 1_000_000n,
       olderUsersAddresses: olderUsersAddresses,
       weeksOfVesting: 4,
-      tokenPrice: ethers.utils.parseEther("0.001"),
     };
 
-    governanceToken = (await GovernanceToken.deploy(
-      params.name,
+    governanceToken = (await GovernanceToken.deploy[
+      (params.name,
       params.symbol,
       params.teamAddress,
       params.treasuryAddress,
@@ -56,11 +62,10 @@ describe("GovernanceToken", function () {
       params.olderUsersMintSupply,
       params.earlyAdopterMintSupply,
       params.olderUsersAddresses,
-      params.weeksOfVesting,
-      params.tokenPrice
-    )) as GovernanceToken & Contract;
+      params.weeksOfVesting)
+    ]) as GovernanceToken & Contract;
 
-    await governanceToken.deployed();
+    await governanceToken.waitForDeployment();
   });
 
   describe("Constructor and deploy", async function () {
@@ -68,6 +73,18 @@ describe("GovernanceToken", function () {
       expect(await governanceToken.name()).to.equal("MooveToken");
       expect(await governanceToken.symbol()).to.equal("MOV");
       expect(await governanceToken.cap()).to.equal(ethers.BigNumber.from(5_000_000));
+      expect(await governanceToken.teamAddress()).to.equal(team.address);
+      expect(await governanceToken.treasuryAddress()).to.equal(treasury.address);
+      expect(await governanceToken.teamMintSupply()).to.equal(ethers.BigNumber.from(1_000_000));
+      expect(await governanceToken.olderUsersMintSupply()).to.equal(ethers.BigNumber.from(500_000));
+      expect(await governanceToken.earlyAdopterMintSupply()).to.equal(ethers.BigNumber.from(500_000));
+      expect(await governanceToken.weeksOfVesting()).to.equal(4);
+
+      const storedOlderUsersAddresses = await governanceToken.olderUsersAddresses();
+      expect(storedOlderUsersAddresses).to.have.lengthOf(olderUsersAddresses.length);
+      for (let i = 0; i < numberOfOlderUsers; i++) {
+        expect(storedOlderUsersAddresses[i]).to.equal(olderUsersAddresses[i]);
+      }
     });
 
     it("should emit the event of deploy", async function () {});

@@ -1,6 +1,6 @@
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
-import { Contract, parseUnits, parseEther, randomBytes } from "ethers";
+import { Contract } from "ethers";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { TreasuryDAO } from "../typechain-types/contracts";
 import { getLatestBlockTimestamp } from "../Utils/getTimeBlockStamp";
@@ -25,18 +25,22 @@ describe("TreasuryDAO", function () {
     externalUser2 = signers[3];
 
     const TreasuryDAO = await ethers.getContractFactory("TreasuryDAO");
-    treasuryDAO = await TreasuryDAO.deploy(team.address);
+    treasuryDAO = (await TreasuryDAO.deploy(team.address)) as TreasuryDAO & Contract;
+    await treasuryDAO.waitForDeployment();
   });
 
   it("should deploy TreasuryDAO correctly and emit the event", async function () {
     const teamAddress = await treasuryDAO.i_Owner();
     const DAOAddress = await treasuryDAO.i_DAOContract();
 
+    expect(teamAddress).to.be.properAddress;
+    expect(DAOAddress).to.be.properAddress;
+
     await expect(treasuryDAO.target).to.not.equal(0x0000000000000000000000000000000000000000);
 
-    //await expect(treasuryDAO);
-    //  .to.emit(treasuryDAO, "TeasuryDAOContractDeployedCorrectly")
-    //  .withArgs(teamAddress, DAOAddress);
+    await expect(treasuryDAO)
+      .to.emit(treasuryDAO, "TeasuryDAOContractDeployedCorrectly")
+      .withArgs(teamAddress, DAOAddress);
   });
 
   it("should print correct addresses on deploy's event", async function () {
