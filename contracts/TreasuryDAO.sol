@@ -21,8 +21,6 @@ contract TreasuryDAO is ReentrancyGuard {
     event Deposit(address indexed from, uint256 amount, uint256 timestamp);
     event FailedWithdraw(address indexed recipient, uint256 amount, uint256 timestamp);
     event SuccesfulTWithdraw(address indexed recipient, uint256 amount, uint256 timestamp);
-    event ReceiveTriggered(address sender, uint256 amount, uint256 timestamp);
-    event FallbackTriggered(address sender, uint256 amount, bytes data, uint256 timestamp);
     event EmergencyWithdraw(uint256 amount, uint256 timestamp);
 
 //modifiers
@@ -39,7 +37,6 @@ contract TreasuryDAO is ReentrancyGuard {
 //variables and mappings
     address immutable public i_Owner;
     address immutable public i_DAOContract;
-    address payable immutable public payableOwner = payable(i_Owner);
 
 //constructor
     constructor(address _teamAddress){
@@ -67,22 +64,20 @@ contract TreasuryDAO is ReentrancyGuard {
 
     function emergencyWithdraw() external onlyOwner {
         if(address(this).balance == 0){revert TreasuryDAO__NothingToWithdraw();}
-        (bool success,) = payableOwner.call{value: address(this).balance}("");
+        bool success = payable(i_Owner).send(address(this).balance);
         if (!success) {
-            emit FailedWithdraw(payableOwner, address(this).balance, block.timestamp);
+            emit FailedWithdraw(i_Owner, address(this).balance, block.timestamp);
         revert TreasuryDAO__TransferFailed();
         } else emit EmergencyWithdraw(address(this).balance, block.timestamp);
     }
 
     receive() external payable{
-        emit ReceiveTriggered(msg.sender, msg.value, block.timestamp);
         if(msg.sender == i_DAOContract){
             emit Deposit(msg.sender, msg.value, block.timestamp);
         } else revert TreasuryDAO__SendETHToGovernanceContractToBuyTokens(i_DAOContract);
     }
 
     fallback() external payable{
-        emit FallbackTriggered(msg.sender, msg.value, msg.data, block.timestamp);
         revert TreasuryDAO__UseGovernanceContractToInteractWithTheDAO(i_DAOContract);   
     }
 

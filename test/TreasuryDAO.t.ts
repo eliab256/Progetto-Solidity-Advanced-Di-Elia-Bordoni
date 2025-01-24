@@ -34,7 +34,7 @@ describe("TreasuryDAO", function () {
 
     await expect(treasuryDAO.target).to.not.equal(0x0000000000000000000000000000000000000000);
 
-    //await expect(treasuryDAO)
+    //await expect(treasuryDAO);
     //  .to.emit(treasuryDAO, "TeasuryDAOContractDeployedCorrectly")
     //  .withArgs(teamAddress, DAOAddress);
   });
@@ -53,9 +53,8 @@ describe("TreasuryDAO", function () {
   });
 
   it("should return the correct  balance of the contract with balance more than 0", async function () {
-    const treasuryDAOAddress = treasuryDAO.target;
     const addingBalance = 100;
-    await setBalance(treasuryDAOAddress as string, getEtherValue(addingBalance));
+    await setBalance(treasuryDAO.target as string, getEtherValue(addingBalance));
 
     const newBalance = await treasuryDAO.getBalance();
     expect(await treasuryDAO.getBalance()).to.equal(newBalance);
@@ -64,9 +63,8 @@ describe("TreasuryDAO", function () {
   describe("Withdraw function", async function () {
     it("should allow the DAO to withdraw funds successfully", async function () {
       const receiver = externalUser1.address;
-      const treasuryDAOAddress = treasuryDAO.target;
       const initialContractBalance = getEtherValue(100);
-      await setBalance(treasuryDAOAddress as string, initialContractBalance);
+      await setBalance(treasuryDAO.target as string, initialContractBalance);
       await setBalance(DAO.address, initialContractBalance);
       const extUser1InitialBalance = getEtherValue(0);
       await setBalance(externalUser1.address, extUser1InitialBalance);
@@ -92,9 +90,8 @@ describe("TreasuryDAO", function () {
 
     it("should revert if other user try to withdraw funds", async function () {
       const receiver = externalUser2.address;
-      const treasuryDAOAddress = treasuryDAO.target;
       const initialContractBalance = getEtherValue(100);
-      await setBalance(treasuryDAOAddress as string, initialContractBalance);
+      await setBalance(treasuryDAO.target as string, initialContractBalance);
 
       const withdrawAmount = getEtherValue(10);
       await expect(treasuryDAO.connect(externalUser1).withdraw(withdrawAmount, receiver)).to.be.revertedWithCustomError(
@@ -105,9 +102,8 @@ describe("TreasuryDAO", function () {
 
     it("should revert if amount exceed contract balance", async function () {
       const receiver = externalUser1.address;
-      const treasuryDAOAddress = treasuryDAO.target;
       const initialContractBalance = getEtherValue(100);
-      await setBalance(treasuryDAOAddress as string, initialContractBalance);
+      await setBalance(treasuryDAO.target as string, initialContractBalance);
       const extUser1InitialBalance = getEtherValue(0);
       await setBalance(externalUser1.address, extUser1InitialBalance);
 
@@ -118,9 +114,8 @@ describe("TreasuryDAO", function () {
     });
 
     it("should revert if the amount of withdraw is zero", async function () {
-      const treasuryDAOAddress = treasuryDAO.target;
       const initialContractBalance = getEtherValue(100);
-      await setBalance(treasuryDAOAddress as string, initialContractBalance);
+      await setBalance(treasuryDAO.target as string, initialContractBalance);
 
       const withdrawAmount = getEtherValue(0);
       await expect(treasuryDAO.connect(DAO).withdraw(withdrawAmount, DAO)).to.be.revertedWithCustomError(
@@ -133,12 +128,10 @@ describe("TreasuryDAO", function () {
   describe("emergencyWithdraw function", async function () {
     it("should revert if external user try to call emergency widthraw", async function () {
       const initialContractBalance = getEtherValue(100);
-      const treasuryDAOAddress = treasuryDAO.target;
-      await setBalance(treasuryDAOAddress as string, initialContractBalance);
+      await setBalance(treasuryDAO.target as string, initialContractBalance);
 
       const externalUser1Balance = getEtherValue(1);
-      const extUser1Address = externalUser1.address;
-      await setBalance(extUser1Address as string, externalUser1Balance);
+      await setBalance(externalUser1.address as string, externalUser1Balance);
 
       await expect(treasuryDAO.connect(externalUser1).emergencyWithdraw()).to.be.revertedWithCustomError(
         treasuryDAO,
@@ -148,8 +141,7 @@ describe("TreasuryDAO", function () {
 
     it("emergency widthraw should revert if balance is equal tyo zero", async function () {
       const initialContractBalance = getEtherValue(0);
-      const treasuryDAOAddress = treasuryDAO.target;
-      await setBalance(treasuryDAOAddress as string, initialContractBalance);
+      await setBalance(treasuryDAO.target as string, initialContractBalance);
 
       await expect(treasuryDAO.connect(team).emergencyWithdraw()).to.be.revertedWithCustomError(
         treasuryDAO,
@@ -159,8 +151,7 @@ describe("TreasuryDAO", function () {
 
     it("team should allowed to do emergency withdraw", async function () {
       const initialContractBalance = getEtherValue(100);
-      const treasuryDAOAddress = treasuryDAO.target;
-      await setBalance(treasuryDAOAddress as string, initialContractBalance);
+      await setBalance(treasuryDAO.target as string, initialContractBalance);
 
       const initialTeamBalance = getEtherValue(1);
       await setBalance(team.address as string, initialTeamBalance);
@@ -178,56 +169,63 @@ describe("TreasuryDAO", function () {
 
       const finalTeamBalance = await ethers.provider.getBalance(team.address);
       expect(finalTeamBalance).to.be.greaterThan(initialContractBalance);
-      console.log("payableOwner", treasuryDAO.payableOwner);
-      console.log("    initialTeamBalance", initialTeamBalance);
-      console.log("      finalTeamBalance", finalTeamBalance);
-      console.log("initialContractBalance", initialContractBalance);
-      console.log("finalContractBalance", finalContractBalance);
     });
   });
 
-  // it("should receive funds from DAO contract only", async function () {
-  //   const initialBalance = await treasuryDAO.getBalance();
+  describe("receive funds", async function () {
+    let contractInitialBalance: bigint;
+    let extUser1InitialBalance: bigint;
+    let DAOInitialBalance: bigint;
+    let amountSent: bigint;
+    beforeEach(async function () {
+      contractInitialBalance = await treasuryDAO.getBalance();
+      extUser1InitialBalance = getEtherValue(11);
+      DAOInitialBalance = getEtherValue(11);
+      amountSent = getEtherValue(10);
+    });
 
-  //   const amountSentFromANonDAOAddress = getEtherValue(10);
-  //   await expect(
-  //     externalUser1.sendTransaction({
-  //       to: treasuryDAO,
-  //       value: amountSentFromANonDAOAddress,
-  //     })
-  //   )
-  //     .to.emit(treasuryDAO, "ReceiveTriggered")
-  //     .withArgs(externalUser1.address, amountSentFromANonDAOAddress, await getLatestBlockTimestamp())
-  //     .and.to.be.revertedWith(`TreasuryDAO__SendETHToGovernanceContractToBuyTokens(${DAO.address})`);
-  //   expect(await treasuryDAO.getBalance()).to.equal(initialBalance);
+    it("should receive funds from DAO contract only", async function () {
+      await setBalance(DAO.address as string, DAOInitialBalance);
+      const tx = await DAO.sendTransaction({
+        to: treasuryDAO.target,
+        value: amountSent,
+      });
+      const receipt = await tx.wait();
+      if (!receipt) throw new Error("Transaction receipt is null");
 
-  //   const amountSentFromDAO = getEtherValue(10);
-  //   await expect(
-  //     DAO.sendTransaction({
-  //       to: treasuryDAO,
-  //       value: amountSentFromDAO,
-  //     })
-  //   )
-  //     .to.emit(treasuryDAO, "ReceiveTriggered")
-  //     .withArgs(DAO.address, amountSentFromDAO, await getLatestBlockTimestamp())
-  //     .and.to.emit(treasuryDAO, "Deposit")
-  //     .withArgs(DAO.address, amountSentFromDAO, await getLatestBlockTimestamp());
-  //   expect(await treasuryDAO.getBalance()).to.equal(amountSentFromDAO);
-  // });
+      await expect(tx)
+        .and.to.emit(treasuryDAO, "Deposit")
+        .withArgs(DAO.address, amountSent, await getLatestBlockTimestamp());
+      const finalContractBalance = await treasuryDAO.getBalance();
+      expect(finalContractBalance).to.equal(contractInitialBalance + amountSent);
+      expect(await ethers.provider.getBalance(DAO.address)).to.be.lt(DAOInitialBalance - amountSent);
+    });
 
-  it("fallback should revert and emit an event", async function () {
-    const amountToSend = getEtherValue(10);
-    const randomData = "xyz1234";
-    await expect(
-      externalUser1.sendTransaction({
-        to: treasuryDAO,
-        value: amountToSend,
-        data: randomData,
-      })
-    )
-      .to.emit(treasuryDAO, "FallbackTriggered")
-      .withArgs(externalUser1, amountToSend, randomData, await getLatestBlockTimestamp())
-      .and.to.be.revertedWith(`TreasuryDAO__UseGovernanceContractToInteractWithTheDAO(${DAO.address})`);
-    expect(await treasuryDAO.getBalance()).to.equal(0);
+    it("should revert if someone except DAO try to add funds", async function () {
+      await setBalance(externalUser1.address as string, extUser1InitialBalance);
+      await expect(
+        externalUser1.sendTransaction({
+          to: treasuryDAO.target,
+          value: amountSent,
+        })
+      )
+        .to.be.revertedWithCustomError(treasuryDAO, "TreasuryDAO__SendETHToGovernanceContractToBuyTokens")
+        .withArgs(DAO.address);
+      expect(await treasuryDAO.getBalance()).to.equal(contractInitialBalance);
+    });
+
+    it("fallback should revert", async function () {
+      const randomData = ethers.hexlify(ethers.randomBytes(8));
+      await expect(
+        externalUser1.sendTransaction({
+          to: treasuryDAO,
+          value: amountSent,
+          data: randomData,
+        })
+      )
+        .and.to.be.revertedWithCustomError(treasuryDAO, `TreasuryDAO__UseGovernanceContractToInteractWithTheDAO`)
+        .withArgs(DAO.address);
+      expect(await treasuryDAO.getBalance()).to.equal(0);
+    });
   });
 });
