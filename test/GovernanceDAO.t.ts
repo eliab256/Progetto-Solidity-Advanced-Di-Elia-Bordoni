@@ -29,7 +29,7 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
     earlyAdopterMintSupply: 500_000n,
     olderUsersAddresses: [],
     weeksOfVesting: 4,
-    tokenPrice: ethers.utils.parseEther("0.001"),
+    tokenPrice: ethers.parseEther("0.001"),
     minimumTokenStakedToMakeAProposal: 50n,
     minimumCirculatingSupplyToMakeAProposalInPercent: 3_500_000n,
     proposalQuorumPercent: 20,
@@ -60,7 +60,7 @@ describe("GovernanceDAO", function () {
     const params = getDefaultParams({ olderUsersAddresses });
     //assegnare i vari address team e owner
 
-    governanceDAO = await GovernanceDAO.deploy(...Object.values(params));
+    governanceDAO = await GovernanceDAO.deploy(params);
 
     await governanceDAO.deployed();
   });

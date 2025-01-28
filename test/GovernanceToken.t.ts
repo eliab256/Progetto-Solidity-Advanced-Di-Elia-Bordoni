@@ -37,33 +37,22 @@ describe("GovernanceToken", function () {
     numberOfOlderUsers = 10;
     olderUsersAddresses = signers.slice(3, 3 + numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
 
-    const GovernanceToken = await ethers.getContractFactory("GovernanceToken");
-
     const params: ConstructorTokenStruct = {
       name: "MooveToken",
       symbol: "MOV",
       teamAddress: team.address,
       treasuryAddress: treasury.address,
-      teamMintSupply: 4_000_000n,
-      cap: 10_000_000n,
-      olderUsersMintSupply: 1_000_000n,
-      earlyAdopterMintSupply: 1_000_000n,
+      teamMintSupply: BigInt(4000000),
+      cap: BigInt(10000000),
+      olderUsersMintSupply: BigInt(1000000),
+      earlyAdopterMintSupply: BigInt(1000000),
       olderUsersAddresses: olderUsersAddresses,
       weeksOfVesting: 4,
     };
 
-    governanceToken = (await GovernanceToken.deploy[
-      (params.name,
-      params.symbol,
-      params.teamAddress,
-      params.treasuryAddress,
-      params.teamMintSupply,
-      params.cap,
-      params.olderUsersMintSupply,
-      params.earlyAdopterMintSupply,
-      params.olderUsersAddresses,
-      params.weeksOfVesting)
-    ]) as GovernanceToken & Contract;
+    const GovernanceToken = await ethers.getContractFactory("GovernanceToken");
+
+    governanceToken = (await GovernanceToken.deploy(params)) as GovernanceToken & Contract;
 
     await governanceToken.waitForDeployment();
   });

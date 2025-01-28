@@ -6,16 +6,16 @@ import { TreasuryDAO } from "../typechain-types/contracts";
 import { getLatestBlockTimestamp } from "../Utils/getTimeBlockStamp";
 import { setBalance } from "@nomicfoundation/hardhat-network-helpers";
 
+function getEtherValue(value: number): bigint {
+  return ethers.parseEther(`${value.toString()}`);
+}
+
 describe("TreasuryDAO", function () {
   let treasuryDAO: TreasuryDAO & Contract;
   let team: SignerWithAddress;
   let DAO: SignerWithAddress;
   let externalUser1: SignerWithAddress;
   let externalUser2: SignerWithAddress;
-
-  function getEtherValue(value: number): bigint {
-    return ethers.parseEther(`${value.toString()}`);
-  }
 
   beforeEach(async function () {
     const signers: SignerWithAddress[] = await ethers.getSigners();
