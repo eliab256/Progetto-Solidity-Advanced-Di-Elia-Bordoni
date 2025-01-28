@@ -100,11 +100,11 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 //Constructor
     constructor(TokenConstructorParams memory params) ERC20(params.name, params.symbol) {
         uint256 totalInitialMint = params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply;
-        if(totalInitialMint > params.cap){
-            revert GovernanceToken__MaxSupplyReached(totalInitialMint, params.cap);
-        }
         if(params.cap == 0){
             revert GovernanceToken__CapMustBeGreaterThanZero();
+        }
+        if(totalInitialMint > params.cap){
+            revert GovernanceToken__MaxSupplyReached(totalInitialMint, params.cap);
         }
 
         i_Owner = params.teamAddress;

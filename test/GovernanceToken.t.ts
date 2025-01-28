@@ -92,31 +92,64 @@ describe("GovernanceToken", function () {
 
     // it("should emit the event of deploy", async function () {});
 
-    // it("should revert if totalInitialMint exceed cap", async function () {
-    //   const params: ConstructorTokenStruct = getDefaultParams({ cap: BigInt(4000000) });
-    //   const GovernanceTokenTest = await ethers.getContractFactory("GovernanceToken");
-    //   const totalInitialMint = params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply;
+    it("should revert if totalInitialMint exceed cap", async function () {
+      const params: ConstructorTokenStruct = getDefaultParams({
+        teamAddress: team.address,
+        treasuryAddress: treasury.address,
+        cap: BigInt(4000000),
+      });
+      const GovernanceTokenTest = await ethers.getContractFactory("GovernanceToken");
+      const totalInitialMint = params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply;
 
-    //   await expect(GovernanceTokenTest.deploy(params))
-    //     .to.be.revertedWithCustomError(GovernanceTokenTest, "GovernanceToken__MaxSupplyReached")
-    //     .withArgs(totalInitialMint, params.cap);
-    // });
+      await expect(GovernanceTokenTest.deploy(params))
+        .to.be.revertedWithCustomError(GovernanceTokenTest, "GovernanceToken__MaxSupplyReached")
+        .withArgs(totalInitialMint, params.cap);
+    });
 
-    // it("should revert if cap is equal to 0", async function () {
-    //   const params: ConstructorTokenStruct = getDefaultParams({ cap: BigInt(0) });
-    //   const GovernanceTokenTest = await ethers.getContractFactory("GovernanceToken");
+    it("should revert if cap is equal to 0", async function () {
+      const params: ConstructorTokenStruct = getDefaultParams({
+        teamAddress: team.address,
+        treasuryAddress: treasury.address,
+        cap: BigInt(0),
+      });
+      const GovernanceTokenTest = await ethers.getContractFactory("GovernanceToken");
 
-    //   await expect(GovernanceTokenTest.deploy(params)).to.be.revertedWithCustomError(
-    //     GovernanceTokenTest,
-    //     "GovernanceToken__CapMustBeGreaterThanZero"
-    //   );
-    // });
+      await expect(GovernanceTokenTest.deploy(params)).to.be.revertedWithCustomError(
+        GovernanceTokenTest,
+        "GovernanceToken__CapMustBeGreaterThanZero"
+      );
+    });
 
-    //it("Should mint the correct amount of tokens for the team", async function () {});
+    it("Should mint the correct amount of tokens for the team", async function () {
+      expect(await governanceToken.balanceOf(team.address)).to.equal(
+        BigInt((await governanceToken.i_teamMintSupply()) * BigInt(10 ** 18))
+      );
+    });
 
-    // it("Should distribute tokens evenly to older users", async function () {});
+    it("Should take on the contract tokens evenly to older users", async function () {
+      const olderUsersMintSupply = await governanceToken.i_olderUsersMintSupply();
+      const olderUsersAddressesLength = numberOfOlderUsers;
+      const expectedBalance = olderUsersMintSupply / BigInt(olderUsersAddressesLength);
 
-    // it("Should mint the remaining tokens to the contract address", async function () {});
+      for (let i = 0; i < olderUsersAddressesLength; i++) {
+        const userAddress = await governanceToken.olderUsersAddresses(i);
+        expect(await governanceToken.balanceOf(userAddress)).to.equal(expectedBalance);
+      }
+    });
+
+    it("Should mint the remaining tokens to the contract address and send to DAO", async function () {
+      const decimalsMultiplier = BigInt(10 ** 18);
+
+      const teamMintSupply = (await governanceToken.i_teamMintSupply()) * decimalsMultiplier;
+      const olderUsersMintSupply = (await governanceToken.i_olderUsersMintSupply()) * decimalsMultiplier;
+      const earlyAdopterMintSupply = (await governanceToken.i_earlyAdopterMintSupply()) * decimalsMultiplier;
+      const totalInitialMint = teamMintSupply + olderUsersMintSupply + earlyAdopterMintSupply;
+      const cap = await governanceToken.i_cap();
+      const expectedDAOBalance = cap - totalInitialMint;
+
+      expect(await governanceToken.balanceOf(governanceToken.target)).to.equal(earlyAdopterMintSupply);
+      expect(await governanceToken.balanceOf(DAO.address)).to.equal(expectedDAOBalance);
+    });
 
     // it("Should emit the events on deployment contracts", async function () {});
   });
@@ -147,20 +180,16 @@ describe("GovernanceToken", function () {
     //   it("elegible addresses should be able to claim their tokens", async function () {});
 
     it("DAO should be able to send token to other addresses", async function () {
-      console.log("externalUser1 token balance: ", await governanceToken.balanceOf(externalUser1.address));
-      console.log("contract token balance: ", await governanceToken.balanceOf(governanceToken.target));
-      const amountTransfered = BigInt(await governanceToken.balanceOf(governanceToken.target));
+      const amountTransfered = BigInt(await governanceToken.balanceOf(DAO.address));
       const tx = await governanceToken.connect(DAO).sendingToken(externalUser1.address, amountTransfered);
       const receipt = await tx.wait();
       if (!receipt) throw new Error("Transaction receipt is null");
 
-      console.log("final externalUser1 token balance: ", await governanceToken.balanceOf(externalUser1.address));
-      console.log("final contract token balance: ", await governanceToken.balanceOf(governanceToken.target));
       expect(await governanceToken.balanceOf(externalUser1.address)).to.equal(amountTransfered);
-      expect(await governanceToken.balanceOf(governanceToken.target)).to.equal(0);
+      expect(await governanceToken.balanceOf(DAO.address)).to.equal(0);
     });
 
-    it(" should revert is someone exept DAO try to send token to other addresses", async function () {
+    it("should revert is someone exept DAO try to send token to other addresses", async function () {
       const amountTransfered = BigInt(await governanceToken.balanceOf(governanceToken.target));
       await expect(governanceToken.connect(externalUser2).sendingToken(externalUser1.address, amountTransfered)).to.be
         .reverted;

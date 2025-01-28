@@ -23,15 +23,15 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
   return {
     name: "MooveToken",
     symbol: "MOV",
-    teamMintSupply: 2_000_000n,
-    cap: 5_000_000n,
-    olderUsersMintSupply: 500_000n,
-    earlyAdopterMintSupply: 500_000n,
+    teamMintSupply: BigInt(2_000_000),
+    cap: BigInt(5_000_000),
+    olderUsersMintSupply: BigInt(500_000),
+    earlyAdopterMintSupply: BigInt(500_000),
     olderUsersAddresses: [],
     weeksOfVesting: 4,
     tokenPrice: ethers.parseEther("0.001"),
-    minimumTokenStakedToMakeAProposal: 50n,
-    minimumCirculatingSupplyToMakeAProposalInPercent: 3_500_000n,
+    minimumTokenStakedToMakeAProposal: BigInt(50),
+    minimumCirculatingSupplyToMakeAProposalInPercent: BigInt(3_500_000),
     proposalQuorumPercent: 20,
     slashingPercent: 10,
     votingPeriodInDays: 14,
@@ -41,7 +41,6 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
 
 describe("GovernanceDAO", function () {
   let governanceDAO;
-  let DAO;
   let team;
   let externalUser1;
   let externalUser2;
@@ -57,7 +56,6 @@ describe("GovernanceDAO", function () {
     const GovernanceDAO = await ethers.getContractFactory("GovernanceDAO");
 
     const params = getDefaultParams({ olderUsersAddresses });
-    //assegnare i vari address team e owner
 
     governanceDAO = await GovernanceDAO.deploy(params);
 
