@@ -498,7 +498,7 @@ contract GovernanceDAO is ReentrancyGuard{
         uint256 ethAmountInUsd = getConversionRate(msg.value);
         uint256 amountToSend = ethAmountInUsd / tokenPriceWithDecimals;
 
-        MooveToken.sendingToken(address(this), msg.sender, amountToSend);
+        MooveToken.sendingToken( msg.sender, amountToSend);
         emit TokenPurchased(msg.sender, amountToSend, block.timestamp);
 
         MooveToken.updateElegibleAdresses(msg.sender);

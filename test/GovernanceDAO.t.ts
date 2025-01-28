@@ -49,11 +49,10 @@ describe("GovernanceDAO", function () {
 
   beforeEach(async function () {
     const signers: SignerWithAddress[] = await ethers.getSigners();
-    DAO = signers[0];
-    team = signers[1];
-    externalUser1 = signers[2];
-    externalUser2 = signers[3];
-    const olderUsersAddresses = signers.slice(4, 4 + numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
+    team = signers[0];
+    externalUser1 = signers[1];
+    externalUser2 = signers[2];
+    const olderUsersAddresses = signers.slice(3, 3 + numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
 
     const GovernanceDAO = await ethers.getContractFactory("GovernanceDAO");
 

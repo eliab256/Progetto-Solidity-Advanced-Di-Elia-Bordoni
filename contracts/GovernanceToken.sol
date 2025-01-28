@@ -60,12 +60,13 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     //about time
     uint256 public immutable i_deployTimeStamp;
     uint256 private constant i_timestampWeek = 604800;
-    uint8 private immutable i_weeksOfVesting;
+    uint8 public immutable i_weeksOfVesting;
     
     //minting sessions
-    uint256 private immutable i_teamMintSupply;    
-    uint256 private immutable i_olderUsersMintSupply;    
-    uint256 private immutable i_earlyAdopterMintSupply;  
+    uint256 public immutable i_teamMintSupply;    
+    uint256 public immutable i_olderUsersMintSupply;    
+    uint256 public immutable i_earlyAdopterMintSupply;  
+    address [] public olderUsersAddresses;
     
     //special addresses
     address public immutable i_Owner;
@@ -73,10 +74,10 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     address public immutable i_treasuryContract;
 
     //token and vesting 
-    uint256 private immutable i_cap;
+    uint256 public immutable i_cap;
     uint256 public totalMintedToken;
     
-    bool private vestingPeriod = false;
+    bool private vestingPeriod = true;
 
     mapping (uint256 => address) elegibleForClaims; 
     mapping (address => uint256) claimsAmountForAddress;
@@ -110,6 +111,7 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         i_DAOContract = msg.sender;
         i_treasuryContract = params.treasuryAddress;
         i_cap = params.cap;
+        olderUsersAddresses = params.olderUsersAddresses;
 
         // Mint tokens for the team
         if(params.teamMintSupply > 0){
@@ -122,10 +124,10 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
             _mint(address(this), params.olderUsersMintSupply * 10 ** decimals());
             i_olderUsersMintSupply = params.olderUsersMintSupply;
             
-            uint256 tokenForUser = i_olderUsersMintSupply / params.olderUsersAddresses.length;
-            for (uint256 i = 0; i < params.olderUsersAddresses.length; i++) {   
+            uint256 tokenForUser = i_olderUsersMintSupply / olderUsersAddresses.length;
+            for (uint256 i = 0; i < olderUsersAddresses.length; i++) {   
                 require(balanceOf(address(this)) >= tokenForUser, "Not enough tokens in contract");
-                _transfer(address(this), params.olderUsersAddresses[i], tokenForUser);
+                _transfer(address(this), olderUsersAddresses[i], tokenForUser);
             }
         }
         
@@ -199,6 +201,10 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         
     }
 
+    function changeVestingPeriodStatus() internal onlyDAO{
+        vestingPeriod = !vestingPeriod;
+    }
+
     function vestingTokenClaims() public inactiveVestingPeriod {
         if(claimsAmountForAddress[msg.sender] == 0){
             revert("You are not eligible for the claim");
@@ -207,8 +213,8 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         _transfer(address(this),msg.sender,claimsAmountForAddress[msg.sender]);
     }
 
-    function sendingToken(address _daoAddress, address _addressFunder, uint256 _amount) public onlyDAO{
-        _transfer(_daoAddress,_addressFunder,_amount);
+    function sendingToken( address _addressFunder, uint256 _amount) public onlyDAO{
+        _transfer(msg.sender,_addressFunder,_amount);
     }
 
     receive() external payable{
