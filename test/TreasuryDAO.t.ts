@@ -29,7 +29,7 @@ describe("TreasuryDAO", function () {
     await treasuryDAO.waitForDeployment();
   });
 
-  it("should deploy TreasuryDAO correctly and emit the event", async function () {
+  it("should deploy TreasuryDAO correctly", async function () {
     const teamAddress = await treasuryDAO.i_Owner();
     const DAOAddress = await treasuryDAO.i_DAOContract();
 
@@ -37,10 +37,14 @@ describe("TreasuryDAO", function () {
     expect(DAOAddress).to.be.properAddress;
 
     await expect(treasuryDAO.target).to.not.equal(0x0000000000000000000000000000000000000000);
+  });
 
-    await expect(treasuryDAO)
-      .to.emit(treasuryDAO, "TeasuryDAOContractDeployedCorrectly")
-      .withArgs(teamAddress, DAOAddress);
+  it("Should emit the event on deployment contracts", async function () {
+    const TreasuryDAOTest = await ethers.getContractFactory("TreasuryDAO");
+
+    await expect(TreasuryDAOTest.deploy(team.address))
+      .to.emit(TreasuryDAOTest, "TeasuryDAOContractDeployedCorrectly")
+      .withArgs(TreasuryDAOTest.i_Owner, TreasuryDAOTest.i_DAOAddress, await getLatestBlockTimestamp());
   });
 
   it("should print correct addresses on deploy's event", async function () {

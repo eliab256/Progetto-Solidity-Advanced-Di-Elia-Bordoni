@@ -17,11 +17,13 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     error GovernanceToken__VestingPeriodIsActive();
     error GovernanceToken__CapMustBeGreaterThanZero();
     error GovernanceToken__InsufficientBalance();
+    error GovernanceToken__AddressAlreadyRegistered();
+    error GovernanceToken__YouAreNotEligibleForTheClaim();
     error GovernanceToken__SendETHToGovernanceContractToBuyTokens(address _governanceContractAddress);
     error GovernanceToken__UseGovernanceContractToInteractWithTheDAO(address _governanceContractAddress);
 
 //events
-    event GovernanceTokenContractDeployedCorrectly(address teamAddress, address treasuryAddress, address daoAddress, uint256 cap);
+    event GovernanceTokenContractDeployedCorrectly(string name, string symbol, address teamAddress, address treasuryAddress, address daoAddress, uint256 cap);
     event TokenMinting (uint256 tokenMintedAmount, uint256 mintingPeriod);
     event Claimed (address indexed claimant, uint256 amount, uint256 timestamp);
     event ReceiveTriggered(address sender, uint256 amount, uint256 timestamp);
@@ -76,11 +78,13 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     //token and vesting 
     uint256 public immutable i_cap;
     uint256 public totalMintedToken;
+    string public tokenName;
+    string public tokenSymbol;
     
     bool private vestingPeriod = true;
 
-    mapping (uint256 => address) elegibleForClaims; 
-    mapping (address => uint256) claimsAmountForAddress;
+    address [] public elegibleForClaimsArray;
+    mapping (address => uint256) internal claimsAmountForAddress;
     uint256 private index;   
 
 // Constructor Parameters Struct
@@ -99,32 +103,35 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
 //Constructor
     constructor(TokenConstructorParams memory params) ERC20(params.name, params.symbol) {
-        uint256 totalInitialMint = params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply;
+        uint256 totalInitialMint = (params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply) * 10 ** decimals();
         if(params.cap == 0){
             revert GovernanceToken__CapMustBeGreaterThanZero();
         }
-        if(totalInitialMint > params.cap){
-            revert GovernanceToken__MaxSupplyReached(totalInitialMint, params.cap);
+        if(totalInitialMint > (params.cap * 10 ** decimals())){
+            revert GovernanceToken__MaxSupplyReached(totalInitialMint, (params.cap *10 ** decimals()));
         }
 
+        tokenName = params.name;
+        tokenSymbol = params.symbol;
         i_Owner = params.teamAddress;
         i_DAOContract = msg.sender;
         i_treasuryContract = params.treasuryAddress;
-        i_cap = params.cap;
+        i_cap = params.cap * 10 ** decimals();
         olderUsersAddresses = params.olderUsersAddresses;
+        i_teamMintSupply = params.teamMintSupply * 10 ** decimals();
+        i_olderUsersMintSupply = params.olderUsersMintSupply * 10 ** decimals();
+        i_earlyAdopterMintSupply = params.earlyAdopterMintSupply * 10 ** decimals();
 
         // Mint tokens for the team
         if(params.teamMintSupply > 0){
-            i_teamMintSupply = params.teamMintSupply;
-            _mint(params.teamAddress, i_teamMintSupply * 10 ** decimals());
+            _mint(params.teamAddress, i_teamMintSupply);
         }
 
         // Mint tokens for older users
-        if(params.olderUsersAddresses.length > 0 && params.olderUsersMintSupply > 0){
-            _mint(address(this), params.olderUsersMintSupply * 10 ** decimals());
-            i_olderUsersMintSupply = params.olderUsersMintSupply;
+        if(params.olderUsersAddresses.length > 0 && i_olderUsersMintSupply > 0){
+            _mint(address(this), i_olderUsersMintSupply);
             
-            uint256 tokenForUser = i_olderUsersMintSupply / olderUsersAddresses.length;
+            uint256 tokenForUser = (i_olderUsersMintSupply + olderUsersAddresses.length - 1) / olderUsersAddresses.length;
             for (uint256 i = 0; i < olderUsersAddresses.length; i++) {   
                 require(balanceOf(address(this)) >= tokenForUser, "Not enough tokens in contract");
                 _transfer(address(this), olderUsersAddresses[i], tokenForUser);
@@ -132,22 +139,19 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         }
         
         // Mint remaining tokens to contract
-        _mint(address(this), (params.cap * 10 ** decimals()) - totalSupply());
+        _mint(address(this), i_cap - totalSupply());
 
         i_deployTimeStamp = block.timestamp / 86400 * 86400;
 
-        if(params.weeksOfVesting > 0 && params.earlyAdopterMintSupply > 0){
+        if(params.weeksOfVesting > 0 && i_earlyAdopterMintSupply > 0){
             i_weeksOfVesting = params.weeksOfVesting;
-            i_earlyAdopterMintSupply = params.earlyAdopterMintSupply;
         }
 
         // Transfer tokens to DAO
-        _transfer(address(this), i_DAOContract, balanceOf(address(this)) - i_earlyAdopterMintSupply * 10 ** decimals());
+        _transfer(address(this), i_DAOContract, balanceOf(address(this)) - i_earlyAdopterMintSupply);
 
-        emit TokenMinting(totalSupply(), i_deployTimeStamp);
-        emit GovernanceTokenContractDeployedCorrectly(params.teamAddress, params.treasuryAddress, msg.sender, params.cap);
+        emit GovernanceTokenContractDeployedCorrectly(tokenName, tokenSymbol, i_Owner, i_treasuryContract, i_DAOContract, i_cap);
     }
-
 
 //functions
 
@@ -157,6 +161,14 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
     function getCap() public view returns (uint256) {
         return i_cap;
+    }
+
+    function getVestingPeriodStatus() public view onlyDAO returns (bool) {
+        return vestingPeriod;
+    }
+
+    function getClaimsAmountForAddress(address _address) public view onlyOwner returns (uint256) {
+        return claimsAmountForAddress[_address];
     }
    
     function checkEligibilityClaim() public view activeVestingPeriod returns (bool){
@@ -170,44 +182,46 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         return remaningTime / 86400;
     }
 
-    function updateElegibleAdresses(address _buyerAddress) external onlyOwner activeVestingPeriod {
-        for(uint256 i=0; i < index; i++){
-            if(elegibleForClaims[i] == _buyerAddress) {
-                revert("Address already registered");
+    function updateElegibleAdresses(address _buyerAddress) external onlyDAO activeVestingPeriod {
+        for(uint256 i=0; i < elegibleForClaimsArray.length; i++){
+            if(elegibleForClaimsArray[i] == _buyerAddress) {
+                revert GovernanceToken__AddressAlreadyRegistered();
             } 
         }
-        elegibleForClaims[index] = _buyerAddress;
-        index++;
-     
+        elegibleForClaimsArray.push(_buyerAddress);
     }   
 
-    function getTotalBalanceClaims() private onlyOwner inactiveVestingPeriod{
+    function getTotalBalanceClaims() public onlyOwner inactiveVestingPeriod{
         uint256 totalBalance;
 
-        for(uint256 i=0; i < index; i++){
-            address user = elegibleForClaims[i];
-            if (user != address(0)) { 
-            totalBalance += balanceOf(user);
+        for (uint256 i = 0; i < elegibleForClaimsArray.length; i++) {
+            address user = elegibleForClaimsArray[i];
+            if (user != address(0)) {
+                totalBalance += balanceOf(user);
             }
         }
 
-        for(uint256 i=0; i < index; i++){
-            address user = elegibleForClaims[i];
-            if (user != address(0) || balanceOf(user) != 0) { 
-            uint256 userClaimAmount = i_earlyAdopterMintSupply *  balanceOf(user) / totalBalance;
-            claimsAmountForAddress[user] = userClaimAmount;          
+        if (totalBalance == 0) {
+            return;
+        }
+
+        for (uint256 i = 0; i < elegibleForClaimsArray.length; i++) {
+            address user = elegibleForClaimsArray[i];
+            if (user != address(0) && balanceOf(user) > 0) {
+                uint256 userClaimAmount = (i_earlyAdopterMintSupply * balanceOf(user)) / totalBalance;
+                claimsAmountForAddress[user] = userClaimAmount;
             }
         }
         
     }
 
-    function changeVestingPeriodStatus() internal onlyDAO{
+    function changeVestingPeriodStatus() public onlyDAO{
         vestingPeriod = !vestingPeriod;
     }
 
     function vestingTokenClaims() public inactiveVestingPeriod {
         if(claimsAmountForAddress[msg.sender] == 0){
-            revert("You are not eligible for the claim");
+            revert GovernanceToken__YouAreNotEligibleForTheClaim();
         }
         
         _transfer(address(this),msg.sender,claimsAmountForAddress[msg.sender]);

@@ -17,7 +17,7 @@ contract TreasuryDAO is ReentrancyGuard {
     error TreasuryDAO__TransferFailed();
 
 //events
-    event TeasuryDAOContractDeployedCorrectly(address teamAddress, address daoAddress);
+    event TeasuryDAOContractDeployedCorrectly(address teamAddress, address daoAddress, uint256 timestamp);
     event Deposit(address indexed from, uint256 amount, uint256 timestamp);
     event FailedWithdraw(address indexed recipient, uint256 amount, uint256 timestamp);
     event SuccesfulTWithdraw(address indexed recipient, uint256 amount, uint256 timestamp);
@@ -43,7 +43,7 @@ contract TreasuryDAO is ReentrancyGuard {
         if(_teamAddress == 0x0000000000000000000000000000000000000000){revert TreasuryDAO__InvalidInputValue();}
         i_Owner = _teamAddress;
         i_DAOContract = msg.sender;
-        emit TeasuryDAOContractDeployedCorrectly(_teamAddress, msg.sender);
+        emit TeasuryDAOContractDeployedCorrectly(i_Owner, i_DAOContract, block.timestamp);
     }
 
 //functions
