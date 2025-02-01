@@ -17,6 +17,7 @@ contract StakingTokenManager is ReentrancyGuard {
     error StakingTokenManager__NotDAO();
     error StakingTokenManager__TokensLockedDueToActiveProposal();
     error StakingTokenManager__TokensAlreadyLocked();
+    error StakingTokenManager__NoTokensToLock();
     error StakingTokenManager__NoTokensToUnlock();
     error StakingTokenManager__SlashingTransferFailed();
     error StakingTokenManager__SendETHToGovernanceContractToBuyTokens(address _DAOAddress);
@@ -27,7 +28,7 @@ contract StakingTokenManager is ReentrancyGuard {
     event TokensStaked(address indexed user, uint256 amount, uint256 timestamp);
     event TokensUnstaked(address indexed user, uint256 amount, uint256 timestamp);
     event TokenSlashed(address indexed user, uint256 amount, uint256 timestamp);
-    event TokenLoched(address indexed user, uint256 timestamp);
+    event TokenLocked(address indexed user, uint256 timestamp);
     event TokenUnlocked(address indexed user, uint256 timestamp);
     event ReceiveTriggered(address sender, uint256 amount, uint256 timestamp);
     event FallbackTriggered(address sender, uint256 amount, bytes data, uint256 timestamp);
@@ -63,6 +64,15 @@ contract StakingTokenManager is ReentrancyGuard {
     }
 
 //functions
+
+    function getUserStakedTokens(address _address) external view returns(uint256) {
+        return stakingBalances[_address];
+    }
+
+    function checkIfTokensAreLocked(address _address) external view returns (bool){
+        return lockedStakedTokens[_address];
+    }
+
     function stakeTokens(uint256 _amount) external {
         if(i_tokenContract.balanceOf(msg.sender) <= 0){revert StakingTokenManager__NoAvailableTokensToStake();}
         stakingBalances[msg.sender] += _amount;
@@ -88,8 +98,9 @@ contract StakingTokenManager is ReentrancyGuard {
 
     function lockStakedTokens(address _address) external onlyDAO{
         if(lockedStakedTokens[_address]){revert StakingTokenManager__TokensAlreadyLocked(); }
+        if(stakingBalances[_address] == 0){revert StakingTokenManager__NoTokensToLock();}
         lockedStakedTokens[_address] = true;
-        emit TokenLoched(_address, block.timestamp);
+        emit TokenLocked(_address, block.timestamp);
     }
 
     function unlockStakedTokens(address _address) external onlyDAO{
@@ -107,14 +118,6 @@ contract StakingTokenManager is ReentrancyGuard {
         if (!transferSuccess) {revert StakingTokenManager__SlashingTransferFailed();}
 
         emit TokenSlashed(_slashingTarget, salshingAmount, block.timestamp);
-    }
-
-    function getUserStakedTokens(address _address) external view onlyDAO returns(uint256) {
-        return stakingBalances[_address];
-    }
-
-    function checkIfTokensAreLocked(address _address) external view returns (bool){
-        return lockedStakedTokens[_address];
     }
 
     receive() external payable{
