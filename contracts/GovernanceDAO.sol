@@ -18,20 +18,18 @@ contract GovernanceDAO is ReentrancyGuard{
 //custom errors
     //constructor errors
     error GovernanceDAO__NameAndSymbolFieldsCantBeEmpty();
-    error GovernanceDAO__MaxSupplyReached(uint256 _supply, uint256 __cap);
-    error GovernanceDAO__CapMustBeGreaterThanZero();
-    error GovernanceDAO__TokenPriceMustBeGreaterThanZero();
+    error GovernanceDAO__MaxSupplyReached();
     error GovernanceDAO__OlderUsersListMustBeMoreThanZero();
     error GovernanceDAO__InvalidInputValue();
     error GovernanceDAO__CirculatingSupplyCannotExceedCap();
     //proposal errors
     error GovernanceDao__DescriptionCannotBeEmpty();
-    error GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals(uint256 _actualSupply, uint256 _minimumSupply);
+    error GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals();
     error GovernanceDAO__AnotherProposalStillActive();
     error GovernanceDAO__InvalidId();
     error GovernanceDAO__ProposalStillOnVoting();
     //vote errors
-    error GovernanceDAO__InsufficientAmountOfTokenOnContract(uint256 _requestAmount, uint256 _tokenOnContractAmount);
+    error GovernanceDAO__InsufficientAmountOfTokenOnContract();
     error GovernanceDAO__OutOfVotingPeriod();
     error GovernanceDAO__VoteAlreadyRegistered();
     error GovernanceDAO__YourVoteIsDelegated();
@@ -177,9 +175,9 @@ contract GovernanceDAO is ReentrancyGuard{
     constructor(GovernanceConstructorParams memory params){
         if(bytes(params.name).length == 0 || bytes(params.symbol).length == 0 ){revert GovernanceDAO__NameAndSymbolFieldsCantBeEmpty();}
         uint256 totalInitalMint = params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply;
-        if(totalInitalMint > params.cap){revert GovernanceDAO__MaxSupplyReached(totalInitalMint, params.cap);}
-        if(params.cap == 0){revert GovernanceDAO__CapMustBeGreaterThanZero();}
-        if(params.tokenPrice == 0){revert GovernanceDAO__TokenPriceMustBeGreaterThanZero();}
+        if(totalInitalMint > params.cap){revert GovernanceDAO__MaxSupplyReached();}
+        if(params.cap == 0){revert GovernanceDAO__InvalidInputValue();}
+        if(params.tokenPrice == 0){revert GovernanceDAO__InvalidInputValue();}
         if(params.olderUsersMintSupply > 0 && params.olderUsersAddresses.length == 0){revert GovernanceDAO__OlderUsersListMustBeMoreThanZero();}
         if(params.minimumTokenStakedToMakeAProposal == 0 || params.minimumTokenStakedToMakeAProposal > totalInitalMint){
             revert GovernanceDAO__InvalidInputValue();
@@ -229,7 +227,7 @@ contract GovernanceDAO is ReentrancyGuard{
         uint256 minimumCirculatingSupply = MooveToken.totalSupply() * minimumCirculatingSupplyToMakeAProposalInPercent / 100;
         uint256 actualCirculatingSupply = MooveToken.totalSupply() - MooveToken.balanceOf(address(this));
         if(actualCirculatingSupply < minimumCirculatingSupply){
-            revert GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals(actualCirculatingSupply,minimumCirculatingSupply);
+            revert GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals();
         }
 
         if(activeProposers[msg.sender]){revert GovernanceDAO__AnotherProposalStillActive();}
@@ -491,7 +489,7 @@ contract GovernanceDAO is ReentrancyGuard{
         if(isTradingAllowed == false){revert GovernanceDAO__TradingIsNotAllowed();}
         if(msg.value <= 0) {revert GovernanceDAO__InsufficientBalance();}
         if(msg.value > MooveToken.balanceOf(address(this))){
-            revert GovernanceDAO__InsufficientAmountOfTokenOnContract(msg.value, MooveToken.balanceOf(address(this)));
+            revert GovernanceDAO__InsufficientAmountOfTokenOnContract();
         }
         
         uint256 tokenPriceWithDecimals = tokenPrice * 10 ** MooveToken.decimals(); 

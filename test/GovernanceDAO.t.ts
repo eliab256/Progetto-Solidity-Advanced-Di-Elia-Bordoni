@@ -2,6 +2,10 @@ const { ethers } = require("hardhat");
 const { expect } = require("chai");
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
+function getEtherValue(value: number): bigint {
+  return ethers.parseEther(`${value.toString()}`);
+}
+
 interface ConstructorStruct {
   name: string;
   symbol: string;
@@ -11,7 +15,7 @@ interface ConstructorStruct {
   earlyAdopterMintSupply: bigint;
   olderUsersAddresses: string[];
   weeksOfVesting: number;
-  tokenPrice: number;
+  tokenPrice: bigint;
   minimumTokenStakedToMakeAProposal: bigint;
   minimumCirculatingSupplyToMakeAProposalInPercent: bigint;
   proposalQuorumPercent: number;
@@ -29,7 +33,7 @@ function getDefaultParams(overrides: Partial<ConstructorStruct> = {}): Construct
     earlyAdopterMintSupply: BigInt(500_000),
     olderUsersAddresses: [],
     weeksOfVesting: 4,
-    tokenPrice: ethers.parseEther("0.001"),
+    tokenPrice: getEtherValue(0.001),
     minimumTokenStakedToMakeAProposal: BigInt(50),
     minimumCirculatingSupplyToMakeAProposalInPercent: BigInt(3_500_000),
     proposalQuorumPercent: 20,
