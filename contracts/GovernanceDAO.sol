@@ -7,9 +7,12 @@ import {StakingTokenManager} from "./StakingTokenManager.sol";
 import {TreasuryDAO} from "./TreasuryDAO.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {GovernanceDelegationLibrary} from "./GovernanceDelegationLibrary.sol";
 
 
 contract GovernanceDAO is ReentrancyGuard{
+    using GovernanceDelegationLibrary for mapping(address => address[]);
+    using GovernanceDelegationLibrary for address[];
 
     GovernanceToken public MooveToken;
     TreasuryDAO public MooveTreasury;
@@ -49,8 +52,7 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__ETHTransferToTreasuryFailed();
     error GovernanceDAO__TradingIsNotAllowed();
     error GovernanceDAO__InsufficientBalance();
-    error GovernanceDAO__ImportMustBeHigherThanZero();
-    error GovernanceDAO__TryingToWithdrawMoreETHThenBalance(uint256 _amountWithdraw, uint256 _contractBalance);
+    error GovernanceDAO__TryingToWithdrawMoreETHThenBalance();
     //modifiers errors
     error GovernanceDAO__NotOwner();
     error GovernanceDAO__NotEnoughtTokenToVote();
@@ -144,7 +146,7 @@ contract GovernanceDAO is ReentrancyGuard{
     address immutable public i_treasuryContract;
     address immutable public i_stakingContract; 
 
-    uint256 public tokenPrice = getPrice() * 10 ** MooveToken.decimals();
+    uint256 public tokenPrice;
     bool public isTradingAllowed;
 
     uint256 public daysofVoting;
@@ -214,6 +216,7 @@ contract GovernanceDAO is ReentrancyGuard{
         minimumCirculatingSupplyToMakeAProposalInPercent = params.minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
         proposalQuorumPercent = params.proposalQuorumPercent;
         daysofVoting = params.votingPeriodInDays * 86400;
+        tokenPrice = params.tokenPrice;
 
         emit NewTokenPriceSet(params.tokenPrice, block.timestamp);
         emit GovernanceDAOContractDeployedCorrectly (msg.sender, address(this), i_tokenContract, i_treasuryContract, i_stakingContract);
@@ -422,9 +425,6 @@ contract GovernanceDAO is ReentrancyGuard{
     }
 
     //view functions
-    function getMinimumTokenStakedToMakeAProposal() public view returns(uint256) {
-        return minimumTokenStakedToMakeAProposal;
-    }
 
     function getVotePeriodActive(uint256 _id) view external returns(bool){   
         Proposal memory proposal = proposalsById[_id];
@@ -432,35 +432,17 @@ contract GovernanceDAO is ReentrancyGuard{
         return proposal.endVotingTimestamp > block.timestamp;
     }
 
-    function checkIfDelegator(address _address) public view returns (bool) {
-        address[] storage delegators = delegateeToDelegators[_address];
-        
-        for (uint i = 0; i < delegators.length; i++) {
-            if (delegators[i] == _address) {
-                return false; 
-            }
-        }
-        return true;
+     function checkIfDelegator(address _address) public view returns (bool) {
+        return delegateeToDelegators.checkIfDelegator(_address);
     }
 
     function checkIfDelegatee(address _address) public view returns (bool) {
-       
-        for (uint i = 0; i < delegatees.length; i++) {
-            if (delegatees[i] == _address) {
-                return false; 
-            }
-        }
-        return true;
+        return delegatees.checkIfDelegatee(_address);
     }
 
-    function isSenderInDelegators(address _delegatee, address _delegator) public view returns (bool, uint256) {
-        address[] memory delegators = delegateeToDelegators[_delegatee];
-        for (uint i = 0; i < delegators.length; i++) {
-            if (delegators[i] == _delegator) {
-                return (true, i);
-            }
-        }
-        return (false, 0); 
+    function isSenderInDelegators(address _delegatee, address _delegator) 
+        public view returns (bool, uint256) {
+        return delegateeToDelegators.isSenderInDelegators(_delegatee, _delegator);
     }
 
     function getProposalById(uint256 _proposalId) public view returns (Proposal memory){
@@ -510,14 +492,6 @@ contract GovernanceDAO is ReentrancyGuard{
         return uint256(answer * 1e10);
     }
 
-    function getEthBalance() public view returns(uint256){
-        return address(this).balance;
-    }
-
-    function getPrice() public view returns (uint256){
-        return tokenPrice;
-    }
-
     function getConversionRate(uint256 _ethAmount) private view returns(uint256){
         uint256 ethPrice = getEthPrice();
         uint256 ethAmountInUsd = (ethPrice * _ethAmount) / 1e18;
@@ -530,14 +504,14 @@ contract GovernanceDAO is ReentrancyGuard{
     }
 
     function depositETH()external payable {
-        if(msg.value == 0){revert GovernanceDAO__ImportMustBeHigherThanZero();}
+        if(msg.value == 0){revert GovernanceDAO__InvalidInputValue();}
         emit ETHDeposit(msg.value, msg.sender, block.timestamp);
 
     }
 
     function sendETHToTreasury(uint256 _amount) public onlyOwner{
         if(_amount <= 0){revert GovernanceDAO__InvalidInputValue();}
-        if(_amount > address(this).balance){revert GovernanceDAO__TryingToWithdrawMoreETHThenBalance(_amount, address(this).balance);}
+        if(_amount > address(this).balance){revert GovernanceDAO__TryingToWithdrawMoreETHThenBalance();}
         bool sendSuccess = payable(i_treasuryContract).send(_amount);
         if (!sendSuccess) {
             emit FailedTransferToTreasury(_amount, block.timestamp);

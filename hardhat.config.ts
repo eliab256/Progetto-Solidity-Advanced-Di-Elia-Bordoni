@@ -8,12 +8,12 @@ import "@nomicfoundation/hardhat-chai-matchers";
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.28",
-    // settings: {
-    //   optimizer: {
-    //     enabled: true, //  Abilita l'ottimizzatore Solidity
-    //     runs: 1000, //  Ottimizza per ridurre il bytecode
-    //   },
-    // },
+    settings: {
+      optimizer: {
+        enabled: true, //  Abilita l'ottimizzatore Solidity
+        runs: 1000, //  Ottimizza per ridurre il bytecode
+      },
+    },
   },
 };
 
