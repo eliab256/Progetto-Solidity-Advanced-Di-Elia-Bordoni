@@ -1,4 +1,4 @@
 npx hardhat test test/TreasuryDAO.t.ts --verbose
 npx hardhat test test/StakingTokenManager.t.ts
-npx hardhat test test/GovernanceDAO.t.ts
+npx hardhat test test/GovernanceDAO.t.ts --verbose
 npx hardhat test test/GovernanceToken.t.ts

@@ -147,7 +147,7 @@ contract GovernanceDAO is ReentrancyGuard{
     address immutable public i_stakingContract; 
 
     uint256 public tokenPrice;
-    bool public isTradingAllowed;
+    bool public isTradingAllowed = true;
 
     uint256 public daysofVoting;
     uint256 public minimumTokenStakedToMakeAProposal;
@@ -213,7 +213,7 @@ contract GovernanceDAO is ReentrancyGuard{
         i_Owner = msg.sender;
         i_stakingContract = address(MooveStakingManager);
         minimumTokenStakedToMakeAProposal = params.minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals();
-        minimumCirculatingSupplyToMakeAProposalInPercent = params.minimumCirculatingSupplyToMakeAProposalInPercent * 10 ** MooveToken.decimals();
+        minimumCirculatingSupplyToMakeAProposalInPercent = params.minimumCirculatingSupplyToMakeAProposalInPercent;
         proposalQuorumPercent = params.proposalQuorumPercent;
         daysofVoting = params.votingPeriodInDays * 86400;
         tokenPrice = params.tokenPrice;
@@ -475,30 +475,21 @@ contract GovernanceDAO is ReentrancyGuard{
         }
         
         uint256 tokenPriceWithDecimals = tokenPrice * 10 ** MooveToken.decimals(); 
-        uint256 ethAmountInUsd = getConversionRate(msg.value);
-        uint256 amountToSend = ethAmountInUsd / tokenPriceWithDecimals;
+        uint256 amountToSend = msg.value / tokenPriceWithDecimals;
 
         MooveToken.sendingToken( msg.sender, amountToSend);
         emit TokenPurchased(msg.sender, amountToSend, block.timestamp);
 
-        MooveToken.updateElegibleAdresses(msg.sender);
+        bool vestingperiod = MooveToken.getVestingPeriodStatus();
+        if(vestingperiod){
+            MooveToken.updateElegibleAdresses(msg.sender);
+        }
+       
 
         sendETHToTreasury(msg.value);
     }
 
-    function getEthPrice() private view returns(uint256){
-        AggregatorV3Interface dataFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306);
-        (,int256 answer,,,) = dataFeed.latestRoundData();
-        return uint256(answer * 1e10);
-    }
-
-    function getConversionRate(uint256 _ethAmount) private view returns(uint256){
-        uint256 ethPrice = getEthPrice();
-        uint256 ethAmountInUsd = (ethPrice * _ethAmount) / 1e18;
-        return ethAmountInUsd;
-    }
-
-    function enableTrading() external onlyOwner {
+    function changeTradingStatus() external onlyOwner {
         isTradingAllowed = !isTradingAllowed; 
         emit TradingStatusChanged(isTradingAllowed, block.timestamp);
     }
@@ -509,13 +500,17 @@ contract GovernanceDAO is ReentrancyGuard{
 
     }
 
-    function sendETHToTreasury(uint256 _amount) public onlyOwner{
+    function sendETHToTreasury(uint256 _amount) private {
         if(_amount <= 0){revert GovernanceDAO__InvalidInputValue();}
         if(_amount > address(this).balance){revert GovernanceDAO__TryingToWithdrawMoreETHThenBalance();}
         bool sendSuccess = payable(i_treasuryContract).send(_amount);
         if (!sendSuccess) {
             emit FailedTransferToTreasury(_amount, block.timestamp);
         } else emit SuccesfulTransferToTreasury(_amount, block.timestamp);
+    }
+
+    function sendETHToTreasuryAsOwner(uint256 _amount) public onlyOwner{
+        sendETHToTreasury(_amount);
     }
 
     receive() external payable{

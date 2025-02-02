@@ -5,7 +5,6 @@ import { GovernanceToken } from "../typechain-types/contracts";
 import { Contract } from "ethers";
 import { getLatestBlockTimestamp } from "../Utils/getTimeBlockStamp";
 import { setBalance } from "@nomicfoundation/hardhat-network-helpers";
-import { ERC20__factory } from "../typechain-types";
 
 interface ConstructorTokenStruct {
   name: string;
