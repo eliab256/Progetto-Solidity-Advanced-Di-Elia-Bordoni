@@ -212,7 +212,9 @@ contract GovernanceDAO is ReentrancyGuard{
         i_treasuryContract = address(MooveTreasury);
         i_Owner = msg.sender;
         i_stakingContract = address(MooveStakingManager);
-        minimumTokenStakedToMakeAProposal = params.minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals();
+        minimumTokenStakedToMakeAProposal = params.minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals(); 
+        //20 = 20000000000000000000 
+        //200.5 = 2005000000000000000
         minimumCirculatingSupplyToMakeAProposalInPercent = params.minimumCirculatingSupplyToMakeAProposalInPercent;
         proposalQuorumPercent = params.proposalQuorumPercent;
         daysofVoting = params.votingPeriodInDays * 86400;
@@ -473,18 +475,17 @@ contract GovernanceDAO is ReentrancyGuard{
         if(msg.value > MooveToken.balanceOf(address(this))){
             revert GovernanceDAO__InsufficientAmountOfTokenOnContract();
         }
-        
-        uint256 tokenPriceWithDecimals = tokenPrice * 10 ** MooveToken.decimals(); 
-        uint256 amountToSend = msg.value / tokenPriceWithDecimals;
+    
+        uint256 amountToSend = (msg.value / tokenPrice) * 10 * MooveToken.decimals();
 
         MooveToken.sendingToken( msg.sender, amountToSend);
         emit TokenPurchased(msg.sender, amountToSend, block.timestamp);
 
         bool vestingperiod = MooveToken.getVestingPeriodStatus();
-        if(vestingperiod){
+        bool addressAlreadyRegistered = MooveToken.getElegibleForClaimsArray(msg.sender);
+        if(vestingperiod || addressAlreadyRegistered){
             MooveToken.updateElegibleAdresses(msg.sender);
         }
-       
 
         sendETHToTreasury(msg.value);
     }

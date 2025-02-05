@@ -39,6 +39,11 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         if(msg.sender != i_DAOContract){revert GovernanceToken__NotDAO();}
         _;
     }
+
+    modifier onlyDAOAndOwner(){
+        if(msg.sender != i_DAOContract && msg.sender != i_Owner){revert GovernanceToken__NotOwner();}
+        _;
+    }
     
     modifier maxSupplyNotReached(uint256 _amount){
         if(totalSupply() + (_amount * 10 ** decimals()) > (i_cap * 10 ** decimals())) {
@@ -163,11 +168,20 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
         return i_cap;
     }
 
-    function getVestingPeriodStatus() public view onlyDAO returns (bool) {
+    function getVestingPeriodStatus() public view onlyDAOAndOwner returns (bool) {
         return vestingPeriod;
     }
 
-    function getClaimsAmountForAddress(address _address) public view onlyOwner returns (uint256) {
+    function getElegibleForClaimsArray(address _address) public view onlyDAOAndOwner returns(bool){
+        for (uint256 i = 0; i < elegibleForClaimsArray.length; i++) {
+            if (elegibleForClaimsArray[i] == _address) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function getClaimsAmountForAddress(address _address) public view onlyDAOAndOwner returns (uint256) {
         return claimsAmountForAddress[_address];
     }
    
@@ -228,7 +242,8 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
     }
 
     function sendingToken( address _addressFunder, uint256 _amount) public onlyDAO{
-        _transfer(msg.sender,_addressFunder,_amount);
+       
+        _transfer(msg.sender,_addressFunder, _amount);
     }
 
     receive() external payable{

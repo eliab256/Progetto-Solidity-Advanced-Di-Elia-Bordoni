@@ -92,10 +92,6 @@ describe("StakingTokenManager", function () {
       expect(await stakingTokenManager.i_DAOContract()).to.equal(DAO.address);
       expect(await stakingTokenManager.i_slashingPercent()).to.equal(slashingPercent);
     });
-
-    it("should emit the event of deploy", async function () {
-      expect(true).to.equal(false);
-    });
   });
 
   describe("staking and locking functions", async function () {

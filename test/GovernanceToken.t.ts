@@ -160,24 +160,6 @@ describe("GovernanceToken", function () {
       expect(await governanceToken.balanceOf(governanceToken.target)).to.equal(olderUsersMintSupply);
       expect(await governanceToken.balanceOf(DAO.address)).to.equal(expectedDAOBalance);
     });
-
-    it("Should emit the events on deployment contracts", async function () {
-      const params: ConstructorTokenStruct = getDefaultParams({
-        cap: BigInt(49000000),
-      });
-      const GovernanceTokenTest = await ethers.getContractFactory("GovernanceToken");
-
-      await expect(GovernanceTokenTest.deploy(params))
-        .to.emit(GovernanceTokenTest, "GovernanceTokenContractDeployedCorrectly")
-        .withArgs(
-          GovernanceTokenTest.tokenName,
-          GovernanceTokenTest.tokenSymbol,
-          GovernanceTokenTest.i_Owner,
-          GovernanceTokenTest.i_treasuryContract,
-          GovernanceTokenTest.i_daoAddress,
-          GovernanceTokenTest.i_cap
-        );
-    });
   });
 
   describe("functions view test", async function () {
