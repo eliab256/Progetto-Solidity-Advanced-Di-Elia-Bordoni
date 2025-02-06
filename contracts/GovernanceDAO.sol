@@ -178,18 +178,18 @@ contract GovernanceDAO is ReentrancyGuard{
 //constructor
     constructor(GovernanceConstructorParams memory params){
         if(bytes(params.name).length == 0 || bytes(params.symbol).length == 0 ){revert GovernanceDAO__NameAndSymbolFieldsCantBeEmpty();}
+        if(params.cap == 0){revert GovernanceDAO__InvalidInputValue();}
         uint256 totalInitalMint = params.teamMintSupply + params.olderUsersMintSupply + params.earlyAdopterMintSupply;
         if(totalInitalMint > params.cap){revert GovernanceDAO__MaxSupplyReached();}
-        if(params.cap == 0){revert GovernanceDAO__InvalidInputValue();}
         if(params.tokenPrice == 0){revert GovernanceDAO__InvalidInputValue();}
-        if(params.olderUsersMintSupply > 0 && params.olderUsersAddresses.length == 0){revert GovernanceDAO__OlderUsersListMustBeMoreThanZero();}
-        if(params.minimumTokenStakedToMakeAProposal == 0 || params.minimumTokenStakedToMakeAProposal > totalInitalMint){
+        if(params.minimumTokenStakedToMakeAProposal == 0){
             revert GovernanceDAO__InvalidInputValue();
         }
         if(params.minimumCirculatingSupplyToMakeAProposalInPercent > params.cap){revert GovernanceDAO__CirculatingSupplyCannotExceedCap();}
         if(params.proposalQuorumPercent < 0 || params.proposalQuorumPercent > 100){revert GovernanceDAO__InvalidInputValue();}
         if(params.slashingPercent < 0 || params.slashingPercent > 100){revert GovernanceDAO__InvalidInputValue();}
         if(params.votingPeriodInDays == 0) {revert GovernanceDAO__InvalidInputValue();}
+        if(params.olderUsersMintSupply > 0 && params.olderUsersAddresses.length == 0){revert GovernanceDAO__OlderUsersListMustBeMoreThanZero();}
 
         MooveTreasury = new TreasuryDAO(msg.sender); 
 
