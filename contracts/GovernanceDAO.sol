@@ -9,6 +9,8 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {GovernanceDelegationLibrary} from "./GovernanceDelegationLibrary.sol";
 
+import "hardhat/console.sol";
+
 
 contract GovernanceDAO is ReentrancyGuard{
     using GovernanceDelegationLibrary for mapping(address => address[]);
@@ -152,7 +154,7 @@ contract GovernanceDAO is ReentrancyGuard{
     uint256 public daysofVoting;
     uint256 public minimumTokenStakedToMakeAProposal;
     uint256 public minimumCirculatingSupplyToMakeAProposalInPercent;
-    uint256 internal proposalIdCounter; 
+    uint256 internal proposalIdCounter = 1; 
     uint256 public proposalQuorumPercent;
 
 // Constructor Parameters Struct
@@ -263,7 +265,7 @@ contract GovernanceDAO is ReentrancyGuard{
         emit ProposalCreated(proposal.proposer, proposal.proposalId, proposal.description, proposal.creationTimeStamp, proposal.endVotingTimestamp);
     }
 
-    function applyForDelegate() public onlyEligibleToProposeOrDelegatee() {
+    function applyForDelegatee() public onlyEligibleToProposeOrDelegatee() {
         if(activeProposers[msg.sender]){revert GovernanceDAO__CantBeProposerAndDelegateeTogether();}
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__AlreadyDelegatee();}
@@ -279,7 +281,7 @@ contract GovernanceDAO is ReentrancyGuard{
         emit NewDelegateeApplied(msg.sender);
     }
 
-    function rejectForDelegate() public {
+    function rejectForDelegatee() public {
         if(!checkIfDelegatee(msg.sender)){revert GovernanceDAO__NotAppliedDelegatee();}
         for(uint i; i < proposalIdCounter; i++){
            Proposal memory proposal = getProposalById(i);
@@ -476,7 +478,7 @@ contract GovernanceDAO is ReentrancyGuard{
             revert GovernanceDAO__InsufficientAmountOfTokenOnContract();
         }
     
-        uint256 amountToSend = (msg.value / tokenPrice) * 10 * MooveToken.decimals();
+        uint256 amountToSend = (msg.value / tokenPrice) * 10 ** MooveToken.decimals();
 
         MooveToken.sendingToken( msg.sender, amountToSend);
         emit TokenPurchased(msg.sender, amountToSend, block.timestamp);

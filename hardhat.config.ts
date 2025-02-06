@@ -3,6 +3,8 @@ import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-ignition";
 import "@nomicfoundation/hardhat-ignition-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
+import "solidity-coverage";
+
 //import "hardhat-deploy";
 
 const config: HardhatUserConfig = {

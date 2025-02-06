@@ -6,6 +6,8 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {GovernanceDAO} from "./GovernanceDAO.sol";
 
+import "hardhat/console.sol";
+
 contract GovernanceToken is ERC20, ReentrancyGuard {
 
 //Custom Errors
@@ -42,12 +44,6 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
     modifier onlyDAOAndOwner(){
         if(msg.sender != i_DAOContract && msg.sender != i_Owner){revert GovernanceToken__NotOwner();}
-        _;
-    }
-    
-    modifier maxSupplyNotReached(uint256 _amount){
-        if(totalSupply() + (_amount * 10 ** decimals()) > (i_cap * 10 ** decimals())) {
-            revert GovernanceToken__MaxSupplyReached(totalSupply()/1e18, i_cap);}
         _;
     }
 
