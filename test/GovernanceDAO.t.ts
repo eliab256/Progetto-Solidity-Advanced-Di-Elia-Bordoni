@@ -508,6 +508,41 @@ describe("GovernanceDAO", function () {
         expect(votingPowerExtUser2).to.equal(votingPowerExtUser2Check);
         expect(votingPowerExtUser1).to.equal(votingPowerExtUser1Check);
       });
+
+      it.only("should finalize and approve the proposal after ending voting period", async function () {
+        const firstProposalCall = await governanceDAO.getProposalById(1);
+        const proposalId = firstProposalCall.proposalId;
+        const newTimestamp = firstProposalCall.endVotingTimestamp + BigInt(100);
+        await governanceDAO.connect(externalUser1).voteOnProposal(proposalId, 0);
+        await governanceDAO.connect(externalUser2).delegateeVoteOnProposal(proposalId, 0);
+        await time.increaseTo(newTimestamp);
+        const totalVoteFor =
+          (await stakingTokenManager.getUserStakedTokens(externalUser1)) +
+          (await stakingTokenManager.getUserStakedTokens(externalUser2)) +
+          (await stakingTokenManager.getUserStakedTokens(externalUser3));
+        const finalizeProp = await governanceDAO.connect(team).finalizeProposal(proposalId);
+        const receipt = await finalizeProp.wait();
+        if (!receipt) throw new Error("Transaction receipt is null");
+
+        expect(finalizeProp)
+          .to.emit(governanceDAO, "ProposalApproved")
+          .withArgs(
+            proposalId,
+            firstProposalCall.forVotes,
+            firstProposalCall.againstVotes,
+            firstProposalCall.abstainVotes,
+            firstProposalCall.proposer
+          );
+
+        //devo richiamare la funzione getproposalByID?
+        expect(firstProposalCall.forVotes).to.equal(totalVoteFor);
+        expect(firstProposalCall.againstVotes).to.equal(0);
+        expect(firstProposalCall.abstainVotes).to.equal(0);
+        expect(firstProposalCall.totalVotes).to.equal(totalVoteFor);
+        expect(firstProposalCall.quorumReached).to.equal(true);
+        expect(firstProposalCall.isApproved).to.equal(true);
+        expect(firstProposalCall.isFinalized).to.equal(true);
+      });
     });
   });
 

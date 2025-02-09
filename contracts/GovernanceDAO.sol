@@ -419,7 +419,7 @@ contract GovernanceDAO is ReentrancyGuard{
     function finalizeProposal(uint256 _proposalId) public onlyOwner {
         Proposal memory proposal =  getProposalById(_proposalId);
         if(proposal.creationTimeStamp == 0){revert GovernanceDAO__InvalidId();}
-        if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__ProposalStillOnVoting();}
+        if(proposal.endVotingTimestamp > block.timestamp){revert GovernanceDAO__ProposalStillOnVoting();}
         if(checkQuorumReached(proposal.totalVotes, proposal.abstainVotes)){
             proposal.quorumReached = true;
             if(proposal.forVotes >= proposal.againstVotes){
