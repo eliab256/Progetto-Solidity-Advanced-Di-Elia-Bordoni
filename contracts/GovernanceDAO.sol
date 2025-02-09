@@ -141,6 +141,7 @@ contract GovernanceDAO is ReentrancyGuard{
     mapping (uint256 => ProposalVoteDatabase) public votesById;
     mapping (address => bool) public activeProposers;
     mapping (address => address[]) public delegateeToDelegators;
+    mapping (address => bool) public delegators;
     address[] public delegatees; 
 
     address immutable public i_Owner;
@@ -283,23 +284,24 @@ contract GovernanceDAO is ReentrancyGuard{
 
     function rejectForDelegatee() public {
         if(!checkIfDelegatee(msg.sender)){revert GovernanceDAO__NotAppliedDelegatee();}
-        for(uint i; i < proposalIdCounter; i++){
+        for(uint i = 0; i < proposalIdCounter; i++){
            Proposal memory proposal = getProposalById(i);
            bool delegateeVote = checkVoteById(i, msg.sender);
            if(!proposal.isFinalized && delegateeVote){revert GovernanceDAO__DelegateeVotedAnActiveProposal();}
         }
 
-        for(uint i; i< delegatees.length; i++){
+        for(uint i = 0; i< delegatees.length; i++){
             if(delegatees[i] == msg.sender){
-                delegatees[i] = address(0);
+                delegatees[i] = delegatees[delegatees.length - 1]; 
+                delegatees.pop(); 
+                break; 
             }
         }
 
-        for(uint i; ; i++ ){
-            if(delegateeToDelegators[msg.sender][i] != address(0)){
-                address delegator = delegateeToDelegators[msg.sender][i];
-                MooveStakingManager.unlockStakedTokens(delegator);
-            } else break;
+        uint length = delegateeToDelegators[msg.sender].length;
+        for(uint i = 0;  i < length ; i++ ){
+            address delegator = delegateeToDelegators[msg.sender][i];
+            MooveStakingManager.unlockStakedTokens(delegator);   
         }
 
         delete delegateeToDelegators[msg.sender];
@@ -314,6 +316,7 @@ contract GovernanceDAO is ReentrancyGuard{
         if(!checkIfDelegatee(_delegatee)){revert GovernanceDAO__NotAppliedDelegatee();}
         
         delegateeToDelegators[_delegatee].push(msg.sender);
+        delegators[msg.sender] = true;
         MooveStakingManager.lockStakedTokens(msg.sender);
         uint256 tokensDelegated = MooveStakingManager.getUserStakedTokens(msg.sender);
 
@@ -331,20 +334,24 @@ contract GovernanceDAO is ReentrancyGuard{
         }
 
         (bool isInDelegators, uint256 arrayIndex) = isSenderInDelegators(_delegatee, msg.sender);
-        address[] storage delegators = delegateeToDelegators[_delegatee];
+        address[] storage delegatorsForDelegatee = delegateeToDelegators[_delegatee];
        
         if (!isInDelegators) {
             revert GovernanceDAO__NoDelegationFound();
         } else {
-            delegators[arrayIndex] = delegators[delegators.length - 1];
-            delegators.pop();
+            delegatorsForDelegatee[arrayIndex] = delegatorsForDelegatee[delegatorsForDelegatee.length - 1];
+            delegatorsForDelegatee.pop();
         }
+        
+
+        delegators[msg.sender] = false;
+        
         
         MooveStakingManager.unlockStakedTokens(msg.sender);
         uint256 tokensDelegated = MooveStakingManager.getUserStakedTokens(msg.sender);
         emit VoteUndelegated(msg.sender, tokensDelegated);
     }
-
+    
     function voteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters {
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__YourVoteIsDelegated();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeHasTheirOwnFunctionToVote();}
@@ -353,7 +360,9 @@ contract GovernanceDAO is ReentrancyGuard{
         if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
         if(checkVoteById(_proposalId, msg.sender)){revert GovernanceDAO__VoteAlreadyRegistered();}
 
-        MooveStakingManager.lockStakedTokens(msg.sender);
+        if(MooveStakingManager.checkIfTokensAreLocked(msg.sender) == false){
+            MooveStakingManager.lockStakedTokens(msg.sender);
+        }
         uint256 votingPower = MooveStakingManager.getUserStakedTokens(msg.sender);
 
         ProposalVoteDatabase storage voteDatabase = votesById[_proposalId];
@@ -382,8 +391,9 @@ contract GovernanceDAO is ReentrancyGuard{
         if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
         if(checkVoteById(_proposalId, msg.sender)){revert GovernanceDAO__VoteAlreadyRegistered();}
 
-        uint256 votingPower;
-        for(uint256 i= 0; i > delegateeToDelegators[msg.sender].length ; i++){
+        uint256 votingPower = MooveStakingManager.getUserStakedTokens(msg.sender);
+        
+        for(uint256 i= 0; i < delegateeToDelegators[msg.sender].length ; i++){
             votingPower += MooveStakingManager.getUserStakedTokens(delegateeToDelegators[msg.sender][i]);      
         }
 
@@ -437,7 +447,7 @@ contract GovernanceDAO is ReentrancyGuard{
     }
 
      function checkIfDelegator(address _address) public view returns (bool) {
-        return delegateeToDelegators.checkIfDelegator(_address);
+        return delegators[_address];    
     }
 
     function checkIfDelegatee(address _address) public view returns (bool) {
@@ -461,7 +471,18 @@ contract GovernanceDAO is ReentrancyGuard{
             return true;
         } else if(votersList.voteAbstainTraker[_voter] > 0){
             return true;
-        } else return false;
+        } else return (false);
+    }
+
+    function getVotingPowerOfAddressById(uint256 _proposalId, address _voter)public view returns (uint256){
+        ProposalVoteDatabase storage votersList = votesById[_proposalId];
+        if(votersList.voteForTracker[_voter] > 0){
+            return votersList.voteForTracker[_voter];
+        } else if (votersList.voteAgainstTracker[_voter] > 0){
+            return votersList.voteAgainstTracker[_voter];
+        } else if(votersList.voteAbstainTraker[_voter] > 0){
+            return votersList.voteAbstainTraker[_voter];
+        } else return (0);
     }
 
     function checkQuorumReached(uint256 _totalVoters, uint256 _abstainedVoters) private view returns (bool){
