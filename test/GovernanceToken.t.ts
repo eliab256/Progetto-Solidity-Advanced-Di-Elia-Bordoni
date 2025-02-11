@@ -308,7 +308,7 @@ describe("GovernanceToken", function () {
           data: randomData,
         })
       )
-        .and.to.be.revertedWithCustomError(governanceToken, `GovernanceToken__UseGovernanceContractToInteractWithTheDAO`)
+        .to.be.revertedWithCustomError(governanceToken, `GovernanceToken__UseGovernanceContractToInteractWithTheDAO`)
         .withArgs(DAO.address);
       expect(await ethers.provider.getBalance(governanceToken.target)).to.equal(0);
     });

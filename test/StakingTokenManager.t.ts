@@ -206,7 +206,7 @@ describe("StakingTokenManager", function () {
         data: randomData,
       })
     )
-      .and.to.be.revertedWithCustomError(stakingTokenManager, `StakingTokenManager__UseGovernanceContractToInteractWithTheDAO`)
+      .to.be.revertedWithCustomError(stakingTokenManager, `StakingTokenManager__UseGovernanceContractToInteractWithTheDAO`)
       .withArgs(DAO.address);
     expect(await ethers.provider.getBalance(stakingTokenManager.target)).to.equal(0);
   });

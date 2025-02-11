@@ -216,8 +216,6 @@ contract GovernanceDAO is ReentrancyGuard{
         i_Owner = msg.sender;
         i_stakingContract = address(MooveStakingManager);
         minimumTokenStakedToMakeAProposal = params.minimumTokenStakedToMakeAProposal * 10 ** MooveToken.decimals(); 
-        //20 = 20000000000000000000 
-        //200.5 = 2005000000000000000
         minimumCirculatingSupplyToMakeAProposalInPercent = params.minimumCirculatingSupplyToMakeAProposalInPercent;
         proposalQuorumPercent = params.proposalQuorumPercent;
         daysofVoting = params.votingPeriodInDays * 86400;
@@ -356,7 +354,7 @@ contract GovernanceDAO is ReentrancyGuard{
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__YourVoteIsDelegated();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeHasTheirOwnFunctionToVote();}
         if(_vote > (type(VoteOptions).max) ){revert GovernanceDAO__InvalideVoteOption();}
-        Proposal memory proposal = proposalsById[_proposalId];
+        Proposal storage proposal = proposalsById[_proposalId];
         if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
         if(checkVoteById(_proposalId, msg.sender)){revert GovernanceDAO__VoteAlreadyRegistered();}
 
@@ -380,14 +378,13 @@ contract GovernanceDAO is ReentrancyGuard{
             proposal.totalVotes += votingPower;
             voteDatabase.voteAbstainTraker[msg.sender] = votingPower;
         }
-
         emit SingleVoteRegistered(msg.sender, _vote, votingPower, _proposalId);
     }
 
     function delegateeVoteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters{
         if(!checkIfDelegatee(msg.sender)){revert GovernanceDAO__NotAppliedDelegatee();}
         if(_vote > (type(VoteOptions).max) ){revert GovernanceDAO__InvalideVoteOption();}
-        Proposal memory proposal = proposalsById[_proposalId];
+        Proposal storage proposal = proposalsById[_proposalId];
         if(proposal.endVotingTimestamp < block.timestamp){revert GovernanceDAO__OutOfVotingPeriod();}
         if(checkVoteById(_proposalId, msg.sender)){revert GovernanceDAO__VoteAlreadyRegistered();}
 
@@ -412,12 +409,11 @@ contract GovernanceDAO is ReentrancyGuard{
             proposal.totalVotes += votingPower;
             voteDatabase.voteAbstainTraker[msg.sender] = votingPower;
         }
-        
         emit DelegateeVoteRegistered(msg.sender, _vote, votingPower, _proposalId, delegateeToDelegators[msg.sender]);
     }
 
     function finalizeProposal(uint256 _proposalId) public onlyOwner {
-        Proposal memory proposal =  getProposalById(_proposalId);
+        Proposal storage proposal = proposalsById[_proposalId];
         if(proposal.creationTimeStamp == 0){revert GovernanceDAO__InvalidId();}
         if(proposal.endVotingTimestamp > block.timestamp){revert GovernanceDAO__ProposalStillOnVoting();}
         if(checkQuorumReached(proposal.totalVotes, proposal.abstainVotes)){
@@ -431,10 +427,18 @@ contract GovernanceDAO is ReentrancyGuard{
                 emit ProposalFailed(_proposalId, proposal.forVotes, proposal.againstVotes, proposal.abstainVotes, proposal.proposer);
             }
         } else{ 
+            
             proposal.isFinalized = true;
             MooveStakingManager.tokenSlasher(proposal.proposer);
             emit ProposalRefused(_proposalId, proposal.totalVotes, proposal.abstainVotes, proposal.proposer);
         }
+        console.log("votefor", proposal.forVotes);
+        console.log("total votes:", proposal.totalVotes);
+        console.log("against votes:", proposal.abstainVotes);
+        console.log("abstain votes:", proposal.abstainVotes);
+        console.log("quorum reached:", proposal.quorumReached);
+        console.log("proposal finalized:", proposal.isFinalized);
+        console.log("proposal finalized:", proposal.isApproved);
         activeProposers[proposal.proposer] = false;
     }
 
@@ -465,13 +469,9 @@ contract GovernanceDAO is ReentrancyGuard{
 
     function checkVoteById(uint256 _proposalId, address _voter) public view returns (bool){
         ProposalVoteDatabase storage votersList = votesById[_proposalId];
-        if(votersList.voteForTracker[_voter] > 0){
-            return true;
-        } else if (votersList.voteAgainstTracker[_voter] > 0){
-            return true;
-        } else if(votersList.voteAbstainTraker[_voter] > 0){
-            return true;
-        } else return (false);
+        return (votersList.voteForTracker[_voter] > 0 ||
+                votersList.voteAgainstTracker[_voter] > 0 ||
+                votersList.voteAbstainTraker[_voter] > 0);
     }
 
     function getVotingPowerOfAddressById(uint256 _proposalId, address _voter)public view returns (uint256){
@@ -486,7 +486,7 @@ contract GovernanceDAO is ReentrancyGuard{
     }
 
     function checkQuorumReached(uint256 _totalVoters, uint256 _abstainedVoters) private view returns (bool){
-        if(((_totalVoters * proposalQuorumPercent)/100) >= (_totalVoters - _abstainedVoters)){
+        if(((_totalVoters * proposalQuorumPercent)/100) < (_totalVoters - _abstainedVoters)){
             return true;
         } else return false;
     }
