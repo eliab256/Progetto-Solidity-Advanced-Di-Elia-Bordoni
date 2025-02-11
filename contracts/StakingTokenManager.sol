@@ -35,11 +35,6 @@ contract StakingTokenManager is ReentrancyGuard {
 
 
 //modifiers
-    modifier onlyOwner() {
-        if(msg.sender != i_Owner){ revert StakingTokenManager__NotOwner();}
-        _;
-    }
-
     modifier onlyDAO(){
         if(msg.sender != i_DAOContract){revert StakingTokenManager__NotDAO();}
         _;

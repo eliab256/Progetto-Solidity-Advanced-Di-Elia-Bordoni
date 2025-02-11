@@ -509,7 +509,7 @@ describe("GovernanceDAO", function () {
         expect(votingPowerExtUser1).to.equal(votingPowerExtUser1Check);
       });
 
-      it.only("should finalize and approve the proposal after ending voting period", async function () {
+      it("should finalize and approve the proposal after ending voting period", async function () {
         const firstProposalCall = await governanceDAO.getProposalById(1);
         const proposalId = firstProposalCall.proposalId;
         const newTimestamp = firstProposalCall.endVotingTimestamp + BigInt(100);

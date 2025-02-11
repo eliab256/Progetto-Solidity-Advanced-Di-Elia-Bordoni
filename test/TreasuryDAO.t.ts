@@ -223,7 +223,7 @@ describe("TreasuryDAO", function () {
           data: randomData,
         })
       )
-        .and.to.be.revertedWithCustomError(treasuryDAO, `TreasuryDAO__UseGovernanceContractToInteractWithTheDAO`)
+        .to.be.revertedWithCustomError(treasuryDAO, `TreasuryDAO__UseGovernanceContractToInteractWithTheDAO`)
         .withArgs(DAO.address);
       expect(await treasuryDAO.getBalance()).to.equal(0);
     });
