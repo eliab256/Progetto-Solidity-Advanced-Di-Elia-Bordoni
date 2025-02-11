@@ -325,7 +325,7 @@ contract GovernanceDAO is ReentrancyGuard{
         if(!checkIfDelegator(msg.sender)){revert GovernanceDAO__NoDelegationFound();}
         if(!checkIfDelegatee(_delegatee)){revert GovernanceDAO__NotAppliedDelegatee();}
      
-        for(uint i; i < proposalIdCounter; i++){
+        for(uint i=0; i < proposalIdCounter; i++){
            Proposal memory proposal = getProposalById(i);
            bool delegateeVote = checkVoteById(i, _delegatee);
            if(!proposal.isFinalized && delegateeVote){revert GovernanceDAO__DelegateeVotedAnActiveProposal();}
@@ -341,10 +341,7 @@ contract GovernanceDAO is ReentrancyGuard{
             delegatorsForDelegatee.pop();
         }
         
-
         delegators[msg.sender] = false;
-        
-        
         MooveStakingManager.unlockStakedTokens(msg.sender);
         uint256 tokensDelegated = MooveStakingManager.getUserStakedTokens(msg.sender);
         emit VoteUndelegated(msg.sender, tokensDelegated);
@@ -432,13 +429,7 @@ contract GovernanceDAO is ReentrancyGuard{
             MooveStakingManager.tokenSlasher(proposal.proposer);
             emit ProposalRefused(_proposalId, proposal.totalVotes, proposal.abstainVotes, proposal.proposer);
         }
-        console.log("votefor", proposal.forVotes);
-        console.log("total votes:", proposal.totalVotes);
-        console.log("against votes:", proposal.abstainVotes);
-        console.log("abstain votes:", proposal.abstainVotes);
-        console.log("quorum reached:", proposal.quorumReached);
-        console.log("proposal finalized:", proposal.isFinalized);
-        console.log("proposal finalized:", proposal.isApproved);
+       
         activeProposers[proposal.proposer] = false;
     }
 
@@ -506,10 +497,10 @@ contract GovernanceDAO is ReentrancyGuard{
 
         bool vestingperiod = MooveToken.getVestingPeriodStatus();
         bool addressAlreadyRegistered = MooveToken.getElegibleForClaimsArray(msg.sender);
-        if(vestingperiod || addressAlreadyRegistered){
+        if(vestingperiod && !addressAlreadyRegistered){
             MooveToken.updateElegibleAdresses(msg.sender);
         }
-
+        
         sendETHToTreasury(msg.value);
     }
 

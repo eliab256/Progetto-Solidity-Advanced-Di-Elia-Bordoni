@@ -257,6 +257,19 @@ describe("GovernanceToken", function () {
         user1InitialTokenBalance + (await governanceToken.i_earlyAdopterMintSupply())
       );
     });
+    it("function getTotalBlanceClaims don't send any error if total balance is zero", async function () {
+      const newParams: ConstructorTokenStruct = getDefaultParams({
+        teamAddress: team.address,
+        treasuryAddress: treasury.address,
+        cap: BigInt(20000000),
+      });
+      const GovernanceTokenTest = await ethers.getContractFactory("GovernanceToken");
+      const governanceTokenTest = (await GovernanceTokenTest.deploy(newParams)) as GovernanceToken & Contract;
+
+      await governanceTokenTest.waitForDeployment();
+      await governanceTokenTest.connect(DAO).changeVestingPeriodStatus();
+      await expect(governanceTokenTest.connect(team).getTotalBalanceClaims()).to.not.be.reverted;
+    });
 
     it("should revert if address has nothing to claim", async function () {
       await governanceToken.connect(DAO).changeVestingPeriodStatus();

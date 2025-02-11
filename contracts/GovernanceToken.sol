@@ -203,7 +203,6 @@ contract GovernanceToken is ERC20, ReentrancyGuard {
 
     function getTotalBalanceClaims() public onlyOwner inactiveVestingPeriod{
         uint256 totalBalance;
-
         for (uint256 i = 0; i < elegibleForClaimsArray.length; i++) {
             address user = elegibleForClaimsArray[i];
             if (user != address(0)) {

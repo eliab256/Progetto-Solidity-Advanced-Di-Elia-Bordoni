@@ -5,7 +5,7 @@ import { GovernanceDAO } from "../typechain-types/contracts";
 import { GovernanceToken } from "../typechain-types/contracts";
 import { TreasuryDAO } from "../typechain-types/contracts";
 import { StakingTokenManager } from "../typechain-types/contracts";
-import { Contract } from "ethers";
+import { Contract, ContractTransactionResponse } from "ethers";
 import { getLatestBlockTimestamp } from "../Utils/getTimeBlockStamp";
 import { setBalance, time, mine } from "@nomicfoundation/hardhat-network-helpers";
 
@@ -75,9 +75,13 @@ describe("GovernanceDAO", function () {
   let extUser4NormalVoter: string;
   let validProposalId: number;
   let invalidProposalId: number;
-  let firstProposal: any;
-  let firstApplyForDelegatee: any;
-  let firstDelegateVote: any;
+  let buyTokenUser1: ContractTransactionResponse;
+  let buyTokenUser2: ContractTransactionResponse;
+  let buyTokenUser3: ContractTransactionResponse;
+  let firstProposal: ContractTransactionResponse;
+  let firstApplyForDelegatee: ContractTransactionResponse;
+  let firstDelegateVote: ContractTransactionResponse;
+  let tokenBuyAmountInWei: bigint;
   let proposalDescription: string;
   beforeEach(async function () {
     //create contracts and addresses
@@ -117,11 +121,17 @@ describe("GovernanceDAO", function () {
       await setBalance(extUser3Delegator, extUsersETHIntialBalance);
       await setBalance(extUser4NormalVoter, extUsersETHIntialBalance);
 
-      const tokenBuyAmountInWei = extUsersETHIntialBalance / BigInt(10);
+      tokenBuyAmountInWei = extUsersETHIntialBalance / BigInt(10);
 
-      await governanceDAO.connect(externalUser1).buyToken({ value: tokenBuyAmountInWei });
-      await governanceDAO.connect(externalUser2).buyToken({ value: tokenBuyAmountInWei });
-      await governanceDAO.connect(externalUser3).buyToken({ value: tokenBuyAmountInWei });
+      buyTokenUser1 = await governanceDAO.connect(externalUser1).buyToken({ value: tokenBuyAmountInWei });
+      const receipt = await buyTokenUser1.wait();
+      if (!receipt) throw new Error("Transaction receipt is null");
+      buyTokenUser2 = await governanceDAO.connect(externalUser2).buyToken({ value: tokenBuyAmountInWei });
+      const receipt2 = await buyTokenUser1.wait();
+      if (!receipt2) throw new Error("Transaction receipt is null");
+      buyTokenUser3 = await governanceDAO.connect(externalUser3).buyToken({ value: tokenBuyAmountInWei });
+      const receipt3 = await buyTokenUser1.wait();
+      if (!receipt3) throw new Error("Transaction receipt is null");
 
       const minimimTokenStakedToMakeProposa = await governanceDAO.minimumTokenStakedToMakeAProposal();
       const tokenAmountToStake = minimimTokenStakedToMakeProposa;
@@ -138,14 +148,14 @@ describe("GovernanceDAO", function () {
       proposalDescription = "proposal description";
 
       firstProposal = await governanceDAO.connect(externalUser1).makeProposal(proposalDescription);
-      const receipt = await firstProposal.wait();
-      if (!receipt) throw new Error("Transaction receipt is null");
+      const receipt4 = await firstProposal.wait();
+      if (!receipt4) throw new Error("Transaction receipt is null");
       firstApplyForDelegatee = await governanceDAO.connect(externalUser2).applyForDelegatee();
-      const receipt2 = await firstApplyForDelegatee.wait();
-      if (!receipt2) throw new Error("Transaction receipt is null");
+      const receipt5 = await firstApplyForDelegatee.wait();
+      if (!receipt5) throw new Error("Transaction receipt is null");
       firstDelegateVote = await governanceDAO.connect(externalUser3).delegateVote(extUser2Delegatee);
-      const receipt3 = await firstDelegateVote.wait();
-      if (!receipt3) throw new Error("Transaction receipt is null");
+      const receipt6 = await firstDelegateVote.wait();
+      if (!receipt6) throw new Error("Transaction receipt is null");
     });
     describe("constructor and deploy", async function () {
       it("should deploy the contract with correct parameters", async function () {
@@ -301,7 +311,7 @@ describe("GovernanceDAO", function () {
         expect(result2[0]).to.equal(false);
         expect(result2[1]).to.equal(0);
       });
-      it("should get vote of voter by proposalId", async function () {
+      it("should get vote of voter by proposalId and if token staked are locked", async function () {
         const firstProposalCall = await governanceDAO.getProposalById(1);
         const proposalId = firstProposalCall.proposalId;
         await governanceDAO.connect(externalUser1).voteOnProposal(proposalId, 0); //inFavor
@@ -311,6 +321,17 @@ describe("GovernanceDAO", function () {
         expect(await governanceDAO.connect(externalUser1).checkVoteById(proposalId, extUser2Delegatee)).to.equal(true);
         expect(await governanceDAO.connect(externalUser1).checkVoteById(proposalId, extUser3Delegator)).to.equal(false);
         expect(await governanceDAO.connect(externalUser1).checkVoteById(proposalId, extUser1Proposer)).to.equal(true);
+
+        const buyTokenUser4 = await governanceDAO.connect(externalUser4).buyToken({ value: tokenBuyAmountInWei });
+        const receipt = await buyTokenUser4.wait();
+        if (!receipt) throw new Error("Transaction receipt is null");
+        await governanceToken
+          .connect(externalUser4)
+          .approve(stakingTokenManager, await governanceToken.balanceOf(extUser4NormalVoter));
+        await stakingTokenManager.connect(externalUser4).stakeTokens(await governanceToken.balanceOf(extUser4NormalVoter));
+        expect(await stakingTokenManager.connect(externalUser1).checkIfTokensAreLocked(extUser4NormalVoter)).to.equal(false);
+        await governanceDAO.connect(externalUser4).voteOnProposal(proposalId, 0);
+        expect(await stakingTokenManager.connect(externalUser1).checkIfTokensAreLocked(extUser4NormalVoter)).to.equal(true);
       });
     });
 
@@ -390,7 +411,7 @@ describe("GovernanceDAO", function () {
           .to.emit(governanceDAO, "DelegateeRemvedFromAppliedList")
           .withArgs(extUser2Delegatee);
         console.log("delegatees after", await governanceDAO.delegatees(0));
-        // expect(await governanceDAO.delegatees(0)).to.equal(extUser2Delegatee);
+        expect(await governanceDAO.delegatees(0)).to.equal(extUser2Delegatee);
         // expect(await stakingTokenManager.checkIfTokensAreLocked(extUser2Delegatee)).to.equal(false);
         // expect(await stakingTokenManager.checkIfTokensAreLocked(extUser3Delegator)).to.equal(false);
       });
@@ -647,21 +668,18 @@ describe("GovernanceDAO", function () {
       });
       it("users should be able to buy tokens", async function () {
         const tokenPrice = await governanceDAO.tokenPrice();
-        const extUser1ETHintialBalance = getEtherValue(100);
-        const extUser1ETHToBuyTokens = getEtherValue(10);
-        const tokenBuyAmount = decimalsMultiplier(extUser1ETHToBuyTokens / tokenPrice);
-        await setBalance(externalUser1.address as string, extUser1ETHintialBalance);
-        const tx = await governanceDAO.connect(externalUser1).buyToken({ value: extUser1ETHToBuyTokens });
-        const receipt = await tx.wait();
+        const tokenBuyAmount = decimalsMultiplier(tokenBuyAmountInWei / tokenPrice);
+        const buyTokenUser4 = await governanceDAO.connect(externalUser4).buyToken({ value: tokenBuyAmountInWei });
+        const receipt = await buyTokenUser1.wait();
         if (!receipt) throw new Error("Transaction receipt is null");
 
-        await expect(tx)
+        expect(buyTokenUser4)
           .to.emit(governanceDAO, "TokenPurchased")
           .withArgs(externalUser1.address, tokenBuyAmount, await getLatestBlockTimestamp());
-        expect(await governanceToken.balanceOf(externalUser1.address)).to.equal(tokenBuyAmount);
-        expect(await treasuryDAO.getBalance()).to.equal(extUser1ETHToBuyTokens); //eth used to purchase token are sent to treasury
-
-        expect(await governanceToken.connect(team).getElegibleForClaimsArray(externalUser1.address)).to.equal(true);
+        expect(await governanceToken.balanceOf(externalUser4.address)).to.equal(tokenBuyAmount);
+        expect(await treasuryDAO.getBalance()).to.equal(tokenBuyAmountInWei * BigInt(4)); //eth used to purchase token are sent to treasury
+        //*3 because i bought this amount of wei 4 times (one for each account)
+        expect(await governanceToken.connect(team).getElegibleForClaimsArray(externalUser4.address)).to.equal(true);
       });
 
       it("should revert if try to buy token when trading is not allowed", async function () {
@@ -684,20 +702,6 @@ describe("GovernanceDAO", function () {
       });
 
       it("buy token should update elegibleAddress on token contract", async function () {
-        const extUser1ETHintialBalance = getEtherValue(10);
-        const extUser1ETHToBuyTokens = getEtherValue(1);
-        await setBalance(externalUser1.address as string, extUser1ETHintialBalance);
-        const extUser2ETHintialBalance = getEtherValue(10);
-        const extUser2ETHToBuyTokens = getEtherValue(1);
-        await setBalance(externalUser2.address as string, extUser2ETHintialBalance);
-
-        const tx = await governanceDAO.connect(externalUser1).buyToken({ value: extUser1ETHToBuyTokens });
-        const receipt = await tx.wait();
-        if (!receipt) throw new Error("Transaction receipt is null");
-
-        const tx2 = await governanceDAO.connect(externalUser2).buyToken({ value: extUser2ETHToBuyTokens });
-        const receipt2 = await tx2.wait();
-        if (!receipt2) throw new Error("Transaction receipt is null");
         expect(await governanceToken.elegibleForClaimsArray(0)).to.equal(externalUser1.address);
         expect(await governanceToken.elegibleForClaimsArray(1)).to.equal(externalUser2.address);
       });
@@ -739,35 +743,34 @@ describe("GovernanceDAO", function () {
           .withArgs(amountToTransferToTheTreasury, await getLatestBlockTimestamp());
       });
     });
+  });
+  it("should revert if someone except DAO try to add funds", async function () {
+    const contractInitialBalance = await ethers.provider.getBalance(governanceDAO.target);
+    const extUser1InitialBalance = getEtherValue(11);
+    const amountSent = getEtherValue(10);
+    await setBalance(externalUser1.address as string, extUser1InitialBalance);
+    await expect(
+      externalUser1.sendTransaction({
+        to: governanceDAO.target,
+        value: amountSent,
+      })
+    ).to.be.revertedWithCustomError(governanceDAO, "GovernanceDAO__ToSendETHUseDepositFunction");
+    expect(await ethers.provider.getBalance(governanceDAO.target)).to.equal(contractInitialBalance);
+  });
 
-    it("should revert if someone except DAO try to add funds", async function () {
-      const contractInitialBalance = await ethers.provider.getBalance(governanceDAO.target);
-      const extUser1InitialBalance = getEtherValue(11);
-      const amountSent = getEtherValue(10);
-      await setBalance(externalUser1.address as string, extUser1InitialBalance);
-      await expect(
-        externalUser1.sendTransaction({
-          to: governanceDAO.target,
-          value: amountSent,
-        })
-      ).to.be.revertedWithCustomError(governanceDAO, "GovernanceDAO__ToSendETHUseDepositFunction");
-      expect(await ethers.provider.getBalance(governanceDAO.target)).to.equal(contractInitialBalance);
-    });
-
-    it("fallback should revert", async function () {
-      const contractInitialBalance = await ethers.provider.getBalance(governanceDAO.target);
-      const extUser1InitialBalance = getEtherValue(11);
-      const amountSent = getEtherValue(10);
-      const randomData = ethers.hexlify(ethers.randomBytes(8));
-      await setBalance(externalUser1.address as string, extUser1InitialBalance);
-      await expect(
-        externalUser1.sendTransaction({
-          to: governanceDAO.target,
-          value: amountSent,
-          data: randomData,
-        })
-      ).to.be.revertedWithCustomError(governanceDAO, `GovernanceDAO__NoFunctionCalled`);
-      expect(await ethers.provider.getBalance(governanceDAO.target)).to.equal(contractInitialBalance);
-    });
+  it("fallback should revert", async function () {
+    const contractInitialBalance = await ethers.provider.getBalance(governanceDAO.target);
+    const extUser1InitialBalance = getEtherValue(11);
+    const amountSent = getEtherValue(10);
+    const randomData = ethers.hexlify(ethers.randomBytes(8));
+    await setBalance(externalUser1.address as string, extUser1InitialBalance);
+    await expect(
+      externalUser1.sendTransaction({
+        to: governanceDAO.target,
+        value: amountSent,
+        data: randomData,
+      })
+    ).to.be.revertedWithCustomError(governanceDAO, `GovernanceDAO__NoFunctionCalled`);
+    expect(await ethers.provider.getBalance(governanceDAO.target)).to.equal(contractInitialBalance);
   });
 });
