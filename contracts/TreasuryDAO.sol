@@ -56,19 +56,16 @@ contract TreasuryDAO is ReentrancyGuard {
         if(_amount <= 0){revert TreasuryDAO__InvalidInputValue();}
         if(_amount > address(this).balance){revert TreasuryDAO__TryingToWithdrawMoreETHThenBalance(_amount, address(this).balance);}
         bool sendSuccess = payable(_recipient).send(_amount);
-        if (!sendSuccess) {
-            emit FailedWithdraw(_recipient, _amount, block.timestamp);
-            revert TreasuryDAO__TransferFailed();
-        } else emit SuccesfulTWithdraw(_recipient, _amount, block.timestamp);
-    }
+        if (sendSuccess) {
+            emit SuccesfulTWithdraw(_recipient, _amount, block.timestamp);
+        }}
+
 
     function emergencyWithdraw() external onlyOwner {
         if(address(this).balance == 0){revert TreasuryDAO__NothingToWithdraw();}
         bool success = payable(i_Owner).send(address(this).balance);
-        if (!success) {
-            emit FailedWithdraw(i_Owner, address(this).balance, block.timestamp);
-        revert TreasuryDAO__TransferFailed();
-        } else emit EmergencyWithdraw(address(this).balance, block.timestamp);
+        if(success){
+        emit EmergencyWithdraw(address(this).balance, block.timestamp);}
     }
 
     receive() external payable{

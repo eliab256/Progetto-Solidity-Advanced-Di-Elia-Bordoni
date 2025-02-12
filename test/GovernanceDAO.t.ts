@@ -68,11 +68,13 @@ describe("GovernanceDAO", function () {
   let externalUser2: SignerWithAddress;
   let externalUser3: SignerWithAddress;
   let externalUser4: SignerWithAddress;
+  let externalUser5: SignerWithAddress;
   let numberOfOlderUsers = 10;
   let extUser1Proposer: string;
   let extUser2Delegatee: string;
   let extUser3Delegator: string;
   let extUser4NormalVoter: string;
+  let extUser5SecondDelegatee: string;
   let validProposalId: number;
   let invalidProposalId: number;
   let buyTokenUser1: ContractTransactionResponse;
@@ -91,7 +93,8 @@ describe("GovernanceDAO", function () {
     externalUser2 = signers[2];
     externalUser3 = signers[3];
     externalUser4 = signers[4];
-    const olderUsersAddresses = signers.slice(5, 5 + numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
+    externalUser5 = signers[5];
+    const olderUsersAddresses = signers.slice(6, 6 + numberOfOlderUsers).map((user: SignerWithAddress) => user.address);
 
     const GovernanceDAO = await ethers.getContractFactory("GovernanceDAO");
 
@@ -115,11 +118,13 @@ describe("GovernanceDAO", function () {
       extUser2Delegatee = externalUser2.address;
       extUser3Delegator = externalUser3.address;
       extUser4NormalVoter = externalUser4.address;
+      extUser5SecondDelegatee = externalUser5.address;
 
       await setBalance(extUser1Proposer, extUsersETHIntialBalance);
       await setBalance(extUser2Delegatee, extUsersETHIntialBalance);
       await setBalance(extUser3Delegator, extUsersETHIntialBalance);
       await setBalance(extUser4NormalVoter, extUsersETHIntialBalance);
+      await setBalance(extUser5SecondDelegatee, extUsersETHIntialBalance);
 
       tokenBuyAmountInWei = extUsersETHIntialBalance / BigInt(10);
 
@@ -127,10 +132,10 @@ describe("GovernanceDAO", function () {
       const receipt = await buyTokenUser1.wait();
       if (!receipt) throw new Error("Transaction receipt is null");
       buyTokenUser2 = await governanceDAO.connect(externalUser2).buyToken({ value: tokenBuyAmountInWei });
-      const receipt2 = await buyTokenUser1.wait();
+      const receipt2 = await buyTokenUser2.wait();
       if (!receipt2) throw new Error("Transaction receipt is null");
       buyTokenUser3 = await governanceDAO.connect(externalUser3).buyToken({ value: tokenBuyAmountInWei });
-      const receipt3 = await buyTokenUser1.wait();
+      const receipt3 = await buyTokenUser3.wait();
       if (!receipt3) throw new Error("Transaction receipt is null");
 
       const minimimTokenStakedToMakeProposa = await governanceDAO.minimumTokenStakedToMakeAProposal();
@@ -347,6 +352,30 @@ describe("GovernanceDAO", function () {
             BigInt(await getLatestBlockTimestamp()) + (await governanceDAO.daysofVoting())
           );
       });
+      it("except dao should work correctly", async function () {
+        const amount = await governanceDAO.minimumTokenStakedToMakeAProposal();
+        await governanceToken.approve(stakingTokenManager, await governanceToken.balanceOf(governanceDAO.target));
+        await stakingTokenManager.stakeTokens(amount);
+        expect(await governanceDAO.makeProposal("proposaldescription")).to.revertedWithCustomError(
+          governanceDAO,
+          "GovernanceDAO__DAONotAuthorized"
+        );
+      });
+      it("should revert if there isn't enough circulating supply to make a proposal", async function () {
+        await governanceToken.connect(team).transfer(governanceDAO.target, decimalsMultiplier(1_700_000)); //now circulating supply is not enough
+        const totalSupply = await governanceToken.totalSupply();
+        const circSupplyPercentToPropose = await governanceDAO.minimumCirculatingSupplyToMakeAProposalInPercent();
+        const minimumCirculatingSupply = (totalSupply * circSupplyPercentToPropose) / BigInt(100);
+        const actualCirculatingSupply =
+          totalSupply -
+          (await governanceToken.balanceOf(governanceDAO.target)) -
+          (await governanceToken.balanceOf(governanceToken.target));
+
+        await expect(governanceDAO.connect(externalUser2).makeProposal("proposal2")).to.revertedWithCustomError(
+          governanceDAO,
+          "GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals"
+        );
+      });
       it("should revert if proposer has not enough token staked to make a proposal", async function () {
         await expect(governanceDAO.connect(externalUser4).makeProposal("proposal description"))
           .to.be.revertedWithCustomError(governanceDAO, "GovernanceDAO__NotEnoughtTokenStakedToMakeProposal")
@@ -407,13 +436,27 @@ describe("GovernanceDAO", function () {
       });
       it("should allow delegatee to rejects role and unlock tokens of both delegatee and delegators", async function () {
         expect(await governanceDAO.delegatees(0)).to.equal(extUser2Delegatee);
+        expect(await governanceDAO.getDelegatees()).to.have.lengthOf(1);
         await expect(governanceDAO.connect(externalUser2).rejectForDelegatee())
           .to.emit(governanceDAO, "DelegateeRemvedFromAppliedList")
           .withArgs(extUser2Delegatee);
-        console.log("delegatees after", await governanceDAO.delegatees(0));
+        expect(await governanceDAO.getDelegatees()).to.have.lengthOf(0);
+        expect(await stakingTokenManager.checkIfTokensAreLocked(extUser2Delegatee)).to.equal(false);
+        expect(await stakingTokenManager.checkIfTokensAreLocked(extUser3Delegator)).to.equal(false);
+      });
+      it("should rejects role function works with more than 1 delegatee", async function () {
+        await governanceDAO.connect(externalUser4).buyToken({ value: tokenBuyAmountInWei });
+        await governanceToken.connect(externalUser4).approve(stakingTokenManager, tokenBuyAmountInWei);
+        await stakingTokenManager.connect(externalUser4).stakeTokens(await governanceDAO.minimumTokenStakedToMakeAProposal());
+        await governanceDAO.connect(externalUser4).applyForDelegatee();
+        expect(await governanceDAO.delegatees(1)).to.equal(externalUser4.address);
+        expect(await governanceDAO.getDelegatees()).to.have.lengthOf(2);
+        await expect(governanceDAO.connect(externalUser4).rejectForDelegatee())
+          .to.emit(governanceDAO, "DelegateeRemvedFromAppliedList")
+          .withArgs(externalUser4.address);
+        expect(await governanceDAO.getDelegatees()).to.have.lengthOf(1);
         expect(await governanceDAO.delegatees(0)).to.equal(extUser2Delegatee);
-        // expect(await stakingTokenManager.checkIfTokensAreLocked(extUser2Delegatee)).to.equal(false);
-        // expect(await stakingTokenManager.checkIfTokensAreLocked(extUser3Delegator)).to.equal(false);
+        expect(await stakingTokenManager.checkIfTokensAreLocked(externalUser4.address)).to.equal(false);
       });
       it("should revert if non-delegatee try to rejects his role", async function () {
         await expect(governanceDAO.connect(externalUser4).rejectForDelegatee()).to.revertedWithCustomError(
@@ -421,7 +464,7 @@ describe("GovernanceDAO", function () {
           "GovernanceDAO__NotAppliedDelegatee"
         );
       });
-      it("should revert if delegatee voted on active proposal", async function () {
+      it("should revert if delegatee voted on active proposal and try to reject his role", async function () {
         const firstProposalCall = await governanceDAO.getProposalById(1);
         const proposalId = firstProposalCall.proposalId;
         await governanceDAO.connect(externalUser2).delegateeVoteOnProposal(proposalId, 1);
@@ -457,9 +500,6 @@ describe("GovernanceDAO", function () {
       it("should revert if unauthorized user try to undelegate his vote", async function () {
         const undelegation = governanceDAO.connect(externalUser1).undelegateVote(extUser2Delegatee);
         await expect(undelegation).to.revertedWithCustomError(governanceDAO, "GovernanceDAO__NoDelegationFound");
-
-        const secondUndelegation = governanceDAO.connect(externalUser3).undelegateVote(extUser4NormalVoter);
-        await expect(secondUndelegation).to.revertedWithCustomError(governanceDAO, "GovernanceDAO__NotAppliedDelegatee");
       });
       it("should revert if try to undelegate his vote during an active proposal", async function () {
         const firstProposalCall = await governanceDAO.getProposalById(1);
@@ -470,6 +510,17 @@ describe("GovernanceDAO", function () {
 
         const undelegation = governanceDAO.connect(externalUser3).undelegateVote(extUser2Delegatee);
         await expect(undelegation).to.revertedWithCustomError(governanceDAO, "GovernanceDAO__DelegateeVotedAnActiveProposal");
+      });
+      it("should revert if try to undelegate his vote from a wrong delegatee", async function () {
+        await governanceDAO.connect(externalUser5).buyToken({ value: tokenBuyAmountInWei });
+        await governanceToken
+          .connect(externalUser5)
+          .approve(stakingTokenManager, await governanceToken.balanceOf(extUser5SecondDelegatee));
+        await stakingTokenManager.connect(externalUser5).stakeTokens(await governanceToken.balanceOf(extUser5SecondDelegatee));
+        await governanceDAO.connect(externalUser5).applyForDelegatee();
+
+        const undelegation = governanceDAO.connect(externalUser3).undelegateVote(extUser5SecondDelegatee);
+        await expect(undelegation).to.revertedWithCustomError(governanceDAO, "GovernanceDAO__NoDelegationFoundOnThisDelegatee");
       });
       it("delegatee should be able to vote on proposal", async function () {
         const firstProposalCall = await governanceDAO.getProposalById(1);
@@ -518,22 +569,33 @@ describe("GovernanceDAO", function () {
         const proposalId = firstProposalCall.proposalId;
         const User1vote = 0;
         const User2vote = 2;
+        const User4vote = 1;
+        await governanceDAO.connect(externalUser4).buyToken({ value: tokenBuyAmountInWei });
+        await governanceToken
+          .connect(externalUser4)
+          .approve(stakingTokenManager, await governanceToken.balanceOf(extUser4NormalVoter));
+        await stakingTokenManager.connect(externalUser4).stakeTokens(await governanceToken.balanceOf(extUser4NormalVoter));
+
         const votingPowerExtUser2 =
           (await stakingTokenManager.getUserStakedTokens(extUser2Delegatee)) +
           (await stakingTokenManager.getUserStakedTokens(extUser3Delegator));
         const votingPowerExtUser1 = await stakingTokenManager.getUserStakedTokens(externalUser1);
+        const votingPowerExtUser4 = await stakingTokenManager.getUserStakedTokens(externalUser4);
 
         await governanceDAO.connect(externalUser1).voteOnProposal(proposalId, User1vote);
         await governanceDAO.connect(externalUser2).delegateeVoteOnProposal(proposalId, User2vote);
+        await governanceDAO.connect(externalUser4).voteOnProposal(proposalId, User4vote);
 
         const votingPowerExtUser2Check = await governanceDAO.getVotingPowerOfAddressById(proposalId, extUser2Delegatee);
         const votingPowerExtUser1Check = await governanceDAO.getVotingPowerOfAddressById(proposalId, extUser1Proposer);
+        const votingPowerExtUser4Check = await governanceDAO.getVotingPowerOfAddressById(proposalId, extUser4NormalVoter);
         expect(votingPowerExtUser2).to.equal(votingPowerExtUser2Check);
         expect(votingPowerExtUser1).to.equal(votingPowerExtUser1Check);
         const firstProposalSecondCall = await governanceDAO.getProposalById(1);
-        expect(firstProposalSecondCall.totalVotes).to.equal(votingPowerExtUser2 + votingPowerExtUser1);
+        expect(firstProposalSecondCall.totalVotes).to.equal(votingPowerExtUser2 + votingPowerExtUser1 + votingPowerExtUser4);
         expect(firstProposalSecondCall.forVotes).to.equal(votingPowerExtUser1);
         expect(firstProposalSecondCall.abstainVotes).to.equal(votingPowerExtUser2);
+        expect(firstProposalSecondCall.againstVotes).to.equal(votingPowerExtUser4);
       });
 
       it("should finalize and approve the proposal after ending voting period", async function () {

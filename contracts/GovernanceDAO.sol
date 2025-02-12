@@ -42,6 +42,7 @@ contract GovernanceDAO is ReentrancyGuard{
     //delelgations errors
     error GovernanceDAO__InvalidDelegateeAddress();
     error GovernanceDAO__NoDelegationFound();
+    error GovernanceDAO__NoDelegationFoundOnThisDelegatee();
     error GovernanceDAO__DelegatorHasNotToken();
     error GovernanceDAO__CantBeProposerAndDelegateeTogether();
     error GovernanceDAO__DelegateeCantBeDelegator();
@@ -50,6 +51,7 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__NotAppliedDelegatee();
     error GovernanceDAO__DelegateeVotedAnActiveProposal();
     error GovernanceDAO__DelegateeHasTheirOwnFunctionToVote();
+    error GovernanceDAO__DelegateesListIsEmpty();
     //transfer and trading erros
     error GovernanceDAO__ETHTransferToTreasuryFailed();
     error GovernanceDAO__TradingIsNotAllowed();
@@ -59,6 +61,7 @@ contract GovernanceDAO is ReentrancyGuard{
     error GovernanceDAO__NotOwner();
     error GovernanceDAO__NotEnoughtTokenToVote();
     error GovernanceDAO__NotEnoughtTokenStakedToMakeProposal(uint256 _stakedToken, uint256 _tokenStakedYouNeed);
+    error GovernanceDAO__DAONotAuthorized();
     //receive and fallback errors
     error GovernanceDAO__ToSendETHUseDepositFunction();
     error GovernanceDAO__NoFunctionCalled();
@@ -104,6 +107,11 @@ contract GovernanceDAO is ReentrancyGuard{
 
     modifier onlyEligibleVoters(){
         if(MooveStakingManager.getUserStakedTokens(msg.sender) <= 0){revert GovernanceDAO__NotEnoughtTokenToVote();}
+        _;
+    }
+
+    modifier exceptDAO(){
+        if(msg.sender == address(this)){revert GovernanceDAO__DAONotAuthorized();}
         _;
     }
     
@@ -227,11 +235,11 @@ contract GovernanceDAO is ReentrancyGuard{
 
 //functions
 
-    function makeProposal(string calldata _proposalDescription) external onlyEligibleToProposeOrDelegatee {
+    function makeProposal(string calldata _proposalDescription) external onlyEligibleToProposeOrDelegatee exceptDAO {
         if (bytes(_proposalDescription).length <= 0) {revert GovernanceDao__DescriptionCannotBeEmpty();}
 
         uint256 minimumCirculatingSupply = MooveToken.totalSupply() * minimumCirculatingSupplyToMakeAProposalInPercent / 100;
-        uint256 actualCirculatingSupply = MooveToken.totalSupply() - MooveToken.balanceOf(address(this));
+        uint256 actualCirculatingSupply = MooveToken.totalSupply() - MooveToken.balanceOf(address(this)) - MooveToken.balanceOf(i_tokenContract);
         if(actualCirculatingSupply < minimumCirculatingSupply){
             revert GovernanceDAO__NotEnoughtCirculatingSupplyToMakeProposals();
         }
@@ -257,14 +265,15 @@ contract GovernanceDAO is ReentrancyGuard{
         proposalsById[currentProposalId] = proposal;
         activeProposers[msg.sender] = true;
 
-        MooveStakingManager.lockStakedTokens(msg.sender);
+        if(!MooveStakingManager.checkIfTokensAreLocked(msg.sender)){
+        MooveStakingManager.lockStakedTokens(msg.sender);}
 
         proposalIdCounter++;    
 
         emit ProposalCreated(proposal.proposer, proposal.proposalId, proposal.description, proposal.creationTimeStamp, proposal.endVotingTimestamp);
     }
 
-    function applyForDelegatee() public onlyEligibleToProposeOrDelegatee() {
+    function applyForDelegatee() public onlyEligibleToProposeOrDelegatee exceptDAO {
         if(activeProposers[msg.sender]){revert GovernanceDAO__CantBeProposerAndDelegateeTogether();}
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__AlreadyDelegatee();}
@@ -282,20 +291,25 @@ contract GovernanceDAO is ReentrancyGuard{
 
     function rejectForDelegatee() public {
         if(!checkIfDelegatee(msg.sender)){revert GovernanceDAO__NotAppliedDelegatee();}
-        for(uint i = 0; i < proposalIdCounter; i++){
+        if (delegatees.length == 0) {revert GovernanceDAO__DelegateesListIsEmpty();}
+        for(uint i = 1; i < proposalIdCounter; i++){
            Proposal memory proposal = getProposalById(i);
            bool delegateeVote = checkVoteById(i, msg.sender);
            if(!proposal.isFinalized && delegateeVote){revert GovernanceDAO__DelegateeVotedAnActiveProposal();}
         }
 
         for(uint i = 0; i< delegatees.length; i++){
-            if(delegatees[i] == msg.sender){
-                delegatees[i] = delegatees[delegatees.length - 1]; 
-                delegatees.pop(); 
-                break; 
+            if (delegatees[i] == msg.sender) {
+                if (delegatees.length == 1) { 
+                    delegatees.pop(); 
+                } else {
+                    delegatees[i] = delegatees[delegatees.length - 1]; 
+                    delegatees.pop();
+                }
+                break;
             }
         }
-
+        
         uint length = delegateeToDelegators[msg.sender].length;
         for(uint i = 0;  i < length ; i++ ){
             address delegator = delegateeToDelegators[msg.sender][i];
@@ -308,7 +322,7 @@ contract GovernanceDAO is ReentrancyGuard{
         emit DelegateeRemvedFromAppliedList(msg.sender);
     }   
 
-    function delegateVote(address _delegatee) public onlyEligibleVoters{
+    function delegateVote(address _delegatee) public onlyEligibleVoters exceptDAO{
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeCantBeDelegator();}
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__AlreadyDelegator();}
         if(!checkIfDelegatee(_delegatee)){revert GovernanceDAO__NotAppliedDelegatee();}
@@ -321,7 +335,7 @@ contract GovernanceDAO is ReentrancyGuard{
         emit VoteDelegated(msg.sender, _delegatee, tokensDelegated);
     }
 
-    function undelegateVote(address _delegatee) public onlyEligibleVoters {
+    function undelegateVote(address _delegatee) public onlyEligibleVoters exceptDAO{
         if(!checkIfDelegator(msg.sender)){revert GovernanceDAO__NoDelegationFound();}
         if(!checkIfDelegatee(_delegatee)){revert GovernanceDAO__NotAppliedDelegatee();}
      
@@ -335,7 +349,7 @@ contract GovernanceDAO is ReentrancyGuard{
         address[] storage delegatorsForDelegatee = delegateeToDelegators[_delegatee];
        
         if (!isInDelegators) {
-            revert GovernanceDAO__NoDelegationFound();
+            revert GovernanceDAO__NoDelegationFoundOnThisDelegatee();
         } else {
             delegatorsForDelegatee[arrayIndex] = delegatorsForDelegatee[delegatorsForDelegatee.length - 1];
             delegatorsForDelegatee.pop();
@@ -347,7 +361,7 @@ contract GovernanceDAO is ReentrancyGuard{
         emit VoteUndelegated(msg.sender, tokensDelegated);
     }
     
-    function voteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters {
+    function voteOnProposal(uint256 _proposalId, VoteOptions _vote) public onlyEligibleVoters exceptDAO{
         if(checkIfDelegator(msg.sender)){revert GovernanceDAO__YourVoteIsDelegated();}
         if(checkIfDelegatee(msg.sender)){revert GovernanceDAO__DelegateeHasTheirOwnFunctionToVote();}
         if(_vote > (type(VoteOptions).max) ){revert GovernanceDAO__InvalideVoteOption();}
@@ -449,6 +463,10 @@ contract GovernanceDAO is ReentrancyGuard{
         return delegatees.checkIfDelegatee(_address);
     }
 
+    function getDelegatees() public view returns(address[] memory){
+        return delegatees;
+    }
+
     function isSenderInDelegators(address _delegatee, address _delegator) 
         public view returns (bool, uint256) {
         return delegateeToDelegators.isSenderInDelegators(_delegatee, _delegator);
@@ -483,7 +501,7 @@ contract GovernanceDAO is ReentrancyGuard{
     }
 
     //functions to handle token trading
-    function buyToken() public payable {
+    function buyToken() public payable exceptDAO{
         if(isTradingAllowed == false){revert GovernanceDAO__TradingIsNotAllowed();}
         if(msg.value <= 0) {revert GovernanceDAO__InsufficientBalance();}
         if(msg.value > MooveToken.balanceOf(address(this))){
@@ -509,7 +527,7 @@ contract GovernanceDAO is ReentrancyGuard{
         emit TradingStatusChanged(isTradingAllowed, block.timestamp);
     }
 
-    function depositETH()external payable {
+    function depositETH()external payable exceptDAO{
         if(msg.value == 0){revert GovernanceDAO__InvalidInputValue();}
         emit ETHDeposit(msg.value, msg.sender, block.timestamp);
 
