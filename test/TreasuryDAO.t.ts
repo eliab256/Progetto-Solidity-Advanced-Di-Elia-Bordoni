@@ -229,3 +229,7 @@ describe("TreasuryDAO", function () {
     });
   });
 });
+
+
+
+SE(A3 <5;"gravemente insufficiente";SE(O(A3=5;A3 <6);"insufficiente";SE(O(A3=6;A3 <7);"sufficiente";SE(O(A3=7;A3 <8);"buono";SE(O(A3=8;A3 <9);"molto buono";SE(O(A3=9;A3 <99);"OTTIMO"))))))
