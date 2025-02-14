@@ -106,10 +106,18 @@ The project has three main folders:
     ```
 
 - **Hardhat**
+
   - **Purpose**: A development environment for smart contract deployment and testing.
   - **Installation**:
     ```bash
     npm install --save-dev hardhat
+    ```
+
+- **Dotenv**
+  - **Purpose**: Library to upload variable like API and private key.
+  - **Installation**:
+    ```bash
+    npm install dotenv
     ```
 
 ### Hardhat Plugins
@@ -131,10 +139,18 @@ The project has three main folders:
     ```
 
 - **Ignition**
+
   - **Purpose**: Automates deployment of smart contracts to different Ethereum networks.
   - **Installation**:
     ```bash
     npm install --save-dev @nomiclabs/hardhat-ignition
+    ```
+
+- **Verify**
+  - **Purpose**: AThis allows users to interact with the contract directly from the blockchain explorer.
+  - **Installation**:
+    ```bash
+    npm install --save-dev @nomicfoundation/hardhat-verify
     ```
 
 ## 6. Contributing
