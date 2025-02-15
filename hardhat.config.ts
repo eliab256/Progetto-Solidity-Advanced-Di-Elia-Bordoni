@@ -4,6 +4,7 @@ import "@nomicfoundation/hardhat-chai-matchers";
 import "solidity-coverage";
 import "dotenv/config";
 import "@nomicfoundation/hardhat-verify";
+import "@nomicfoundation/hardhat-ignition-ethers";
 
 const config: HardhatUserConfig = {
   solidity: {

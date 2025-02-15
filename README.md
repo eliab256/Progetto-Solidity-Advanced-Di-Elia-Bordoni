@@ -39,11 +39,10 @@ These contracts have been tested with **107 Hardhat tests**, achieving approxima
 
 ## 2. Contract Address on Sepolia
 
-- **Contract GovernanceDAO**: `[Insert Address Here]`
-- **Contract GovernanceToken**: `[Insert Address Here]`
-- **Contract StakingTokenManager**: `[Insert Address Here]`
-- **Contract TreasuryDAO**: `[Insert Address Here]`
-- **Library GovernanceDelegationLibrary**: `[Insert Address Here]`
+- **Contract GovernanceDAO**: `[0xDcA1ecf6343117FDeA387c847746Ed299d6d32A1]`
+- **Contract GovernanceToken**: `[0xbA8Bb4A4D0C594157C60FE92d8D786BE12F938e2]`
+- **Contract StakingTokenManager**: `[0xC6737e38aAAeE984E4ba809F997C4507fB372a57]`
+- **Contract TreasuryDAO**: `[0xaB3b83D0F549bE536f443b244B3001EE29bA440c]`
 
 ## 3. Project Structure
 
