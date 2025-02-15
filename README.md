@@ -52,6 +52,7 @@ The project has three main folders:
 1. **Contracts**: This folder contains all five contracts.
 2. **Artifacts/Contracts**: This folder contains all artifacts and debug files.
 3. **Test**: This folder contains all the tests. Each smart contract has its own test file.
+4. **Script**: This folder constains two file to deploy the contract. deploy.ts is the deploy script, arguments.ts is the file that pass al the parameters to the constract's constructor.
 
 ## 4. Clone and Configuration
 

@@ -3,9 +3,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "solidity-coverage";
 import "dotenv/config";
-// import "@nomicfoundation/hardhat-ignition";
-// import "@nomicfoundation/hardhat-ignition-ethers";
-//import "hardhat-deploy";
+import "@nomicfoundation/hardhat-verify";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -22,6 +20,12 @@ const config: HardhatUserConfig = {
       url: process.env.ALCHEMY_TESTNET_RPC_URL,
       accounts: [process.env.TESTNET_PRIVATE_KEY as string],
     },
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY as string,
+  },
+  sourcify: {
+    enabled: true,
   },
 };
 
