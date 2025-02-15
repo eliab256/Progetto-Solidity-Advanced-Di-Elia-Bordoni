@@ -14,7 +14,14 @@ async function main() {
   console.log("Waiting for deployment...");
   await governanceDAO.deployed();
 
-  console.log(`✅ Contract deployed at: ${governanceDAO.target}`);
+  const governanceToken = await governanceDAO.i_tokenContract();
+  const stakingTokenManager = await governanceDAO.i_stakingContract();
+  const treasuryDAO = await governanceDAO.i_treasuryContract();
+
+  console.log(`✅ GovernanceDAO Contract deployed at: ${governanceDAO.target}`);
+  console.log(`✅ GovernanceToken Contract deployed at: ${governanceToken}`);
+  console.log(`✅ StakingTokenManager Contract deployed at: ${stakingTokenManager}`);
+  console.log(`✅ TreasuryDAO Contract deployed at: ${treasuryDAO}`);
 }
 
 main()
